@@ -3,13 +3,20 @@ import Footer from "@/components/Footer";
 import MarketWidget from "@/components/MarketWidget";
 import BriefingBody from "@/components/BriefingBody";
 import BriefingCard from "@/components/BriefingCard";
+import LoginGate from "@/components/LoginGate";
 import Link from "next/link";
 import { getLatestBriefing, getRecentBriefings } from "@/lib/queries";
 import { formatDateKor, formatSessionLabel } from "@/lib/format";
+import { auth } from "@/auth";
 
-export const revalidate = 60;
+// 로그인 게이팅 사용 시 SSR 동적 라우팅 필수 (혹시 캐싱 충돌 방지)
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function HomePage() {
+  const session = await auth();
+  if (!session?.user) return <LoginGate />;
+
   const [latest, recentAll] = await Promise.all([
     getLatestBriefing(),
     getRecentBriefings(8),

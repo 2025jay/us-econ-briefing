@@ -4,17 +4,23 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import MarketWidget from "@/components/MarketWidget";
 import BriefingBody from "@/components/BriefingBody";
+import LoginGate from "@/components/LoginGate";
 import { getBriefingByDate } from "@/lib/queries";
 import { formatDateKor, formatSessionLabel } from "@/lib/format";
+import { auth } from "@/auth";
 
 type Props = {
   params: { date: string; session: string };
 };
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 export const dynamicParams = true;
 
 export default async function BriefingDetailPage({ params }: Props) {
+  const session = await auth();
+  if (!session?.user) return <LoginGate />;
+
   if (params.session !== "morning" && params.session !== "evening") {
     notFound();
   }

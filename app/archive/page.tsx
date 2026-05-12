@@ -1,10 +1,13 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BriefingCard from "@/components/BriefingCard";
+import LoginGate from "@/components/LoginGate";
 import { getAllBriefings } from "@/lib/queries";
 import { Briefing } from "@/lib/types";
+import { auth } from "@/auth";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function groupByMonth(items: Briefing[]): Record<string, Briefing[]> {
   return items.reduce(
@@ -23,6 +26,9 @@ function formatMonth(ym: string): string {
 }
 
 export default async function ArchivePage() {
+  const session = await auth();
+  if (!session?.user) return <LoginGate />;
+
   const all = await getAllBriefings();
   const groups = groupByMonth(all);
   const months = Object.keys(groups).sort().reverse();
