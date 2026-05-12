@@ -20,6 +20,8 @@ import time as _time
 from pathlib import Path
 from datetime import datetime
 
+import random
+
 import requests
 import anthropic
 
@@ -74,13 +76,12 @@ def extract_card_news_data(docs_blocks: list) -> list:
                 '    "unsplash_keywords": "시각적 구체 명사 2~4개, 쉼표 구분, 영어 소문자. imageCaption과 같은 시각 도메인. 규칙은 하단 참고."\n'
                 "  }\n"
                 "]\n\n"
-                "카테고리 다양성 가이드 (가급적 준수):\n"
-                "- 01 tag: ENERGY 또는 산업 관련 (예: ENERGY, OIL, INDUSTRY, COMMODITIES)\n"
-                "- 02 tag: GEOPOLITICS (지정학·외교·분쟁)\n"
-                "- 03 tag: FED 또는 일정/정책 (예: FED, POLICY, SCHEDULE, CPI)\n"
-                "- 04 tag: BIG TECH (빅테크·AI·반도체)\n"
-                "- 05 tag: MARKETS (증시·지수·밸류에이션)\n"
-                "- 해당 카테고리 뉴스가 없으면 근접 주제로 대체 가능. tag는 항상 대문자 영문 14자 이내.\n\n"
+                "★ 카테고리 선정 원칙 — 실제 뉴스에 맞게 자유롭게:\n"
+                "- 우선순위: 오늘 가장 중요한 5개 뉴스. 카테고리 슬롯에 억지로 끼워맞추지 말 것.\n"
+                "- 만약 오늘 에너지/지정학/FED/빅테크/증시 골고루 있으면 그 순서로 배치 권장.\n"
+                "- 없으면 그 카테고리를 비우고, 실제 보도된 다른 중요 뉴스(예: M&A, 기업실적, 규제, 노동시장, ESG, 헬스케어)로 대체.\n"
+                "- tag는 항상 대문자 영문 14자 이내. 카테고리 이름을 유연하게 (예: BUZZFEED 매각이면 tag='MEDIA' 또는 'M&A').\n"
+                "- 절대 원문에 없는 사실/수치를 만들지 말 것. 카테고리 채우려고 가공/추측 금지.\n\n"
                 "규칙:\n"
                 "- title은 한 줄 40자 이내 (줄바꿈 금지).\n"
                 "- tldr은 공백 포함 15자 이내 (한국어 기준). 한 줄 디자인이 깨지지 않도록 반드시 준수.\n"
@@ -177,6 +178,10 @@ TAG_FALLBACKS = {
     "MACRO": "global finance",
 }
 
+# 한 번의 generate_card_news 호출 안에서 이미 사용한 사진 URL.
+# 각 카드가 다른 사진 받도록 set으로 추적 (run 시작 시 reset 필요).
+_USED_URLS_THIS_RUN: set = set()
+
 GENERIC_FALLBACKS = ["business", "finance", "technology", "global economy", "stock market"]
 
 
@@ -227,14 +232,17 @@ def fetch_unsplash_image(keywords: str, index: int, card_tag: str = "") -> str:
         seen.add(key)
         dedup_attempts.append((stage, q))
 
-    # 3) 순서대로 시도
+    # 3) 순서대로 시도 — 페이지 랜덤화 + 결과 중 랜덤 선택 + 중복 회피
     for stage, attempt_q in dedup_attempts:
         try:
+            # 페이지를 1~6 사이 랜덤으로 뽑아 매번 다른 사진 풀에 접근
+            random_page = random.randint(1, 6)
             resp = requests.get(
                 "https://api.unsplash.com/search/photos",
                 params={
                     "query": attempt_q,
-                    "per_page": 5,
+                    "per_page": 12,         # 5 → 12로 늘려 선택지 확대
+                    "page": random_page,    # 매번 다른 페이지
                     "orientation": "squarish",
                     "content_filter": "high",
                 },
@@ -246,26 +254,27 @@ def fetch_unsplash_image(keywords: str, index: int, card_tag: str = "") -> str:
             results = data.get("results") or []
 
             if not results:
-                log.warning("%s stage=%-9s keyword='%s' → no results",
-                            card_label, stage, attempt_q)
+                log.warning("%s stage=%-9s keyword='%s' page=%d → no results",
+                            card_label, stage, attempt_q, random_page)
                 continue
 
-            top = results[0]
-            desc = (top.get("description")
-                    or top.get("alt_description")
+            # 이미 다른 카드가 쓴 사진은 제외
+            unused = [r for r in results
+                      if r["urls"]["regular"] not in _USED_URLS_THIS_RUN]
+            pool = unused if unused else results  # 다 쓰였으면 fallback
+
+            chosen = random.choice(pool)
+            _USED_URLS_THIS_RUN.add(chosen["urls"]["regular"])
+
+            desc = (chosen.get("description")
+                    or chosen.get("alt_description")
                     or "(no description)")
-            img_url = top["urls"]["regular"]
-            page_url = (top.get("links") or {}).get("html", "")
+            img_url = chosen["urls"]["regular"]
+            page_url = (chosen.get("links") or {}).get("html", "")
 
-            log.info("%s stage=%-9s keyword='%s' → MATCH: '%s' (%s)",
-                     card_label, stage, attempt_q, desc, page_url or img_url)
-
-            if len(results) > 1:
-                alt_descs = [
-                    (r.get("description") or r.get("alt_description") or "?")
-                    for r in results[1:4]
-                ]
-                log.info("%s   other top results: %s", card_label, " | ".join(alt_descs))
+            log.info("%s stage=%-9s keyword='%s' page=%d → PICK: '%s' (pool=%d)",
+                     card_label, stage, attempt_q, random_page, desc[:60], len(pool))
+            log.info("%s   url: %s", card_label, page_url or img_url)
 
             img_resp = requests.get(img_url, timeout=30)
             img_resp.raise_for_status()
@@ -578,6 +587,9 @@ def generate_card_news(docs_blocks: list, date_str: str) -> tuple:
         from card_news_generator import generate_card_news
         png_files, cards_data = generate_card_news(docs_blocks, "2026.04.14 MON · 00:00 ET")
     """
+    # 매 호출마다 사진 중복 회피용 set 초기화
+    _USED_URLS_THIS_RUN.clear()
+
     import asyncio
 
     log.info("=== 카드뉴스 생성 시작 (Y2K Sticker Pop) ===")

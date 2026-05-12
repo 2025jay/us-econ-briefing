@@ -85,3 +85,19 @@ create policy "activity self read"
 -- Supabase 대시보드: Project Settings → API → Schema Exposure 에
 -- 'briefing'을 추가해야 클라이언트에서 .schema('briefing') 로 접근 가능합니다.
 -- (위 SQL 실행 후 한 번만 설정)
+
+-- ─────────────────────────────────────────────────────────────
+-- GRANTS — service_role/anon/authenticated 권한 부여
+-- (이거 없으면 봇이 briefing 스키마에 INSERT 못함: 42501)
+-- ─────────────────────────────────────────────────────────────
+grant usage on schema briefing to anon, authenticated, service_role;
+grant all on all tables in schema briefing to service_role;
+grant select on all tables in schema briefing to anon, authenticated;
+grant all on all sequences in schema briefing to service_role;
+grant all on all routines in schema briefing to service_role;
+
+-- 앞으로 새로 만들 객체에도 자동 적용
+alter default privileges in schema briefing
+  grant all on tables to service_role;
+alter default privileges in schema briefing
+  grant select on tables to anon, authenticated;
