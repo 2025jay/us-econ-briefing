@@ -1,26 +1,26 @@
 import type { Metadata } from "next";
-import { Jua, Single_Day, JetBrains_Mono } from "next/font/google";
+import { Jua, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-// Google Fonts (Pretendard는 globals.css에서 CDN 로드)
+// next/font/google는 빌드 시점에 폰트를 다운로드합니다.
+// Single Day는 Vercel 빌드 환경에서 가끔 fonts.gstatic.com 차단/타임아웃이 나서
+// globals.css 의 <link>로 클라이언트에서 로드 (--font-single-day 변수만 노출).
+
 const jua = Jua({
   weight: "400",
   subsets: ["latin"],
   variable: "--font-jua",
   display: "swap",
-});
-
-const singleDay = Single_Day({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--font-single-day",
-  display: "swap",
+  preload: false,         // 빌드 시 폰트 차단 회피
+  adjustFontFallback: false,
 });
 
 const jetbrains = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jetbrains",
   display: "swap",
+  preload: false,
+  adjustFontFallback: false,
 });
 
 export const metadata: Metadata = {
@@ -43,7 +43,7 @@ export default function RootLayout({
   return (
     <html
       lang="ko"
-      className={`${jua.variable} ${singleDay.variable} ${jetbrains.variable}`}
+      className={`${jua.variable} ${jetbrains.variable}`}
     >
       <body className="min-h-screen bg-paper bg-grid text-ink antialiased">
         {children}
