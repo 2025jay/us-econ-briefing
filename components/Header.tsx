@@ -2,22 +2,18 @@ import Link from "next/link";
 
 export default function Header() {
   return (
-    <header className="border-b-3 border-ink bg-paper">
-      <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-4">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="rounded-md border-2 border-ink bg-accent-yellow px-2 py-1 font-display text-lg leading-none shadow-brutal-sm">
-            ☕
-          </span>
-          <span className="font-display text-xl leading-none">
-            오늘 미국장
+    <header className="border-b border-line bg-bg/80 backdrop-blur sticky top-0 z-10">
+      <div className="mx-auto max-w-mobile px-5 py-3 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-1.5">
+          <span className="text-base font-semibold tracking-tight">
+            US Econ Brief
           </span>
         </Link>
-
         <Link
-          href="/login"
-          className="rounded-md border-2 border-ink bg-white px-3 py-1.5 text-sm font-semibold shadow-brutal-sm transition-transform hover:-translate-y-0.5"
+          href="/archive"
+          className="text-xs text-muted hover:text-ink transition-colors"
         >
-          Google 로그인
+          아카이브
         </Link>
       </div>
     </header>

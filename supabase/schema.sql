@@ -101,3 +101,9 @@ alter default privileges in schema briefing
   grant all on tables to service_role;
 alter default privileges in schema briefing
   grant select on tables to anon, authenticated;
+
+-- ─────────────────────────────────────────────────────────────
+-- notion_url 컬럼 추가 (사이트에서 "노션 전체 보기" 링크용)
+-- ─────────────────────────────────────────────────────────────
+alter table briefing.briefings
+  add column if not exists notion_url text;

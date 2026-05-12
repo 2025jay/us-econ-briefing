@@ -27,7 +27,8 @@ export type Briefing = {
   session_time: SessionTime;
   market_status: MarketStatus;
   briefing_intro: string;
-  items: BriefingItem[]; // 5개
+  items: BriefingItem[]; // 노션의 모든 article (보통 10~15개)
+  notion_url?: string; // 노션 페이지 전체 링크
   generated_at: string; // ISO
 };
 

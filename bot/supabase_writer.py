@@ -50,6 +50,7 @@ def upsert_briefing(
     market_status: Optional[dict],
     briefing_intro: str,
     items: list,
+    notion_url: Optional[str] = None,
 ) -> Optional[str]:
     """
     briefing.briefings 테이블에 upsert.
@@ -65,13 +66,15 @@ def upsert_briefing(
         log.error("session_time은 'morning' 또는 'evening'이어야 함: %s", session_time)
         return None
 
-    payload = {
+    payload: dict = {
         "session_date": session_date,
         "session_time": session_time,
         "market_status": market_status,
         "briefing_intro": briefing_intro,
         "items": items,
     }
+    if notion_url:
+        payload["notion_url"] = notion_url
 
     try:
         # briefing 스키마의 briefings 테이블에 upsert

@@ -9,44 +9,38 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // 베이지 페이퍼 배경 (메인 톤)
-        paper: "#FAF3E0",
-        ink: "#1A1A1A",
-        // 카드 액센트 5색 (순환 사용)
-        accent: {
-          pink: "#ED4983",
-          lime: "#C8E853",
-          yellow: "#F8D742",
-          purple: "#C8B4F0",
-          blue: "#A8C9E8",
-        },
-        // 하이라이트 (손글씨 강조, 형광펜 효과)
-        highlight: {
-          yellow: "#FFFC4F",
-          pink: "#FF4FA3",
-        },
+        // 모던 미니멀 — neutral 베이스 + 단일 액센트
+        bg: "#fafafa",          // 페이지 배경 (거의 흰색, 살짝 그레이)
+        surface: "#ffffff",     // 카드/위젯 배경
+        ink: "#0a0a0a",         // 본문 텍스트
+        muted: "#737373",       // 보조 텍스트
+        subtle: "#a3a3a3",      // 메타데이터 (시간, 출처)
+        line: "#e5e5e5",        // 경계선
+        // 상승/하락 (시장 시황 전용)
+        gain: "#16a34a",        // 초록
+        loss: "#dc2626",        // 빨강
+        // 액센트 (CTA 버튼만)
+        accent: "#171717",      // 검정 (CTA)
       },
       fontFamily: {
         sans: ["var(--font-pretendard)", "system-ui", "sans-serif"],
-        display: ["var(--font-jua)", "var(--font-pretendard)", "sans-serif"],
-        handwriting: ["var(--font-single-day)", "cursive"],
         mono: ["var(--font-jetbrains)", "ui-monospace", "monospace"],
       },
-      boxShadow: {
-        // 네오브루탈리스트 두꺼운 드롭섀도우
-        brutal: "4px 4px 0 0 #1A1A1A",
-        "brutal-lg": "6px 6px 0 0 #1A1A1A",
-        "brutal-sm": "2px 2px 0 0 #1A1A1A",
+      fontSize: {
+        // 모바일 우선. iPhone 13 (390px)에서 잘 읽히게 조정.
+        "2xs": ["10px", { lineHeight: "1.4" }],
+        xs: ["11px", { lineHeight: "1.5" }],
+        sm: ["13px", { lineHeight: "1.55" }],
+        base: ["15px", { lineHeight: "1.6" }],
+        lg: ["17px", { lineHeight: "1.55" }],
+        xl: ["19px", { lineHeight: "1.4" }],
+        "2xl": ["22px", { lineHeight: "1.35" }],
+        "3xl": ["27px", { lineHeight: "1.25" }],
       },
-      borderWidth: {
-        "3": "3px",
-      },
-      backgroundImage: {
-        // 베이지 위 미세한 그리드 패턴
-        grid: "linear-gradient(rgba(26,26,26,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(26,26,26,0.04) 1px, transparent 1px)",
-      },
-      backgroundSize: {
-        grid: "24px 24px",
+      maxWidth: {
+        // iPhone 13 = 390px. max-w를 그 살짝 위로 잡아서 좀 큰 폰에선
+        // 좌우 여백 자연스럽게, 작은 폰에서 깨지지 않게.
+        mobile: "440px",
       },
     },
   },

@@ -1,20 +1,8 @@
-import type { Metadata } from "next";
-import { Jua, JetBrains_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-// next/font/google는 빌드 시점에 폰트를 다운로드합니다.
-// Single Day는 Vercel 빌드 환경에서 가끔 fonts.gstatic.com 차단/타임아웃이 나서
-// globals.css 의 <link>로 클라이언트에서 로드 (--font-single-day 변수만 노출).
-
-const jua = Jua({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--font-jua",
-  display: "swap",
-  preload: false,         // 빌드 시 폰트 차단 회피
-  adjustFontFallback: false,
-});
-
+// 영문/숫자만 mono. 한국어 본문은 globals.css의 Pretendard.
 const jetbrains = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jetbrains",
@@ -24,15 +12,22 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "미국 경제 AI 브리핑 ☕",
+  title: "미국 경제 AI 브리핑",
   description:
-    "매일 아침 8시 30분, 저녁 8시 30분 자동 업데이트되는 미국 경제 브리핑",
+    "매일 한국시간 오전 8:30, 오후 8:30에 자동 게시되는 미국 경제 브리핑",
   openGraph: {
-    title: "미국 경제 AI 브리핑 ☕",
-    description: "오늘 미국장 핵심만 정리해봤어요",
+    title: "미국 경제 AI 브리핑",
+    description: "오늘 미국장 핵심 정리",
     type: "website",
     locale: "ko_KR",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1, // 모바일에서 핀치 줌으로 깨지는 거 방지
+  themeColor: "#fafafa",
 };
 
 export default function RootLayout({
@@ -41,11 +36,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html
-      lang="ko"
-      className={`${jua.variable} ${jetbrains.variable}`}
-    >
-      <body className="min-h-screen bg-paper bg-grid text-ink antialiased">
+    <html lang="ko" className={jetbrains.variable}>
+      <body className="min-h-screen bg-bg text-ink antialiased">
         {children}
       </body>
     </html>

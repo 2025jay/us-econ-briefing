@@ -6,7 +6,6 @@ import { Briefing } from "@/lib/types";
 
 export const revalidate = 60;
 
-// 월별 그룹화 ("2026-05" → Briefing[])
 function groupByMonth(items: Briefing[]): Record<string, Briefing[]> {
   return items.reduce(
     (acc, b) => {
@@ -32,18 +31,20 @@ export default async function ArchivePage() {
     <>
       <Header />
 
-      <main className="mx-auto max-w-3xl px-5 py-6 sm:py-8">
-        <h1 className="font-display text-3xl">📚 아카이브</h1>
-        <p className="mt-2 text-sm opacity-70">
-          지난 미국 경제 브리핑을 한 번에 모아봤어요.
+      <main className="mx-auto max-w-mobile px-5 py-5">
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">
+          아카이브
+        </h1>
+        <p className="mt-1.5 text-sm text-muted">
+          지난 브리핑 모음
         </p>
 
         {months.map((ym) => (
           <section key={ym} className="mt-8">
-            <h2 className="mb-3 inline-block rounded-md border-2 border-ink bg-accent-yellow px-3 py-1 font-display text-lg shadow-brutal-sm">
+            <h2 className="mb-3 text-xs font-semibold text-muted uppercase tracking-wide">
               {formatMonth(ym)}
             </h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
               {groups[ym].map((b) => (
                 <BriefingCard key={b.id} briefing={b} variant="compact" />
               ))}
@@ -52,11 +53,8 @@ export default async function ArchivePage() {
         ))}
 
         {months.length === 0 && (
-          <div className="mt-10 rounded-2xl border-3 border-ink bg-white p-10 text-center shadow-brutal">
-            <p className="font-display text-lg">아직 아카이브가 비어있어요.</p>
-            <p className="mt-2 text-sm opacity-60">
-              곧 첫 브리핑이 도착할 거예요!
-            </p>
+          <div className="mt-10 rounded-lg border border-line bg-surface p-10 text-center">
+            <p className="text-sm text-muted">아직 아카이브가 비어있어요.</p>
           </div>
         )}
       </main>

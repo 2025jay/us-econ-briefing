@@ -30,6 +30,7 @@ function rowToBriefing(row: any): Briefing {
     },
     briefing_intro: row.briefing_intro ?? "",
     items: Array.isArray(row.items) ? row.items : [],
+    notion_url: row.notion_url ?? undefined,
     generated_at: row.generated_at,
   };
 }

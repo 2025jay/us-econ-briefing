@@ -1242,8 +1242,24 @@ def run_cloud() -> None:
         market_status = None
         results["시장시황"] = "실패"
 
-    # 5. Supabase upsert
-    log.info("[5/9] Supabase 저장 시작...")
+    # 5. 노션 페이지 (NOTION env 있을 때만) — 먼저 생성해서 URL 받아옴
+    doc_link = None
+    if NOTION_API_KEY and NOTION_PAGE_ID:
+        log.info("[5/9] 노션 페이지 생성 시작...")
+        t = _time.time()
+        try:
+            doc_link = generate_notion_page(docs_blocks, articles, time_str, market_status_str)
+            log.info("[5/9] 노션 페이지 생성 완료 (%.1f초)", _time.time() - t)
+            results["노션"] = "성공"
+        except Exception:
+            log.exception("[5/9] 노션 페이지 생성 실패")
+            results["노션"] = "실패"
+    else:
+        log.info("[5/9] NOTION env 없음 — 스킵")
+        results["노션"] = "스킵"
+
+    # 6. Supabase upsert (노션 URL 포함)
+    log.info("[6/9] Supabase 저장 시작...")
     t = _time.time()
     try:
         row_id = upsert_briefing(
@@ -1252,28 +1268,13 @@ def run_cloud() -> None:
             market_status=market_status,
             briefing_intro=site_payload.get("briefing_intro", ""),
             items=site_payload.get("items", []),
+            notion_url=doc_link,
         )
-        log.info("[5/9] Supabase 저장 완료 (%.1f초)", _time.time() - t)
+        log.info("[6/9] Supabase 저장 완료 (%.1f초)", _time.time() - t)
         results["Supabase"] = f"성공 ({row_id})" if row_id else "실패/스킵"
     except Exception:
-        log.exception("[5/9] Supabase 저장 실패 (계속 진행)")
+        log.exception("[6/9] Supabase 저장 실패 (계속 진행)")
         results["Supabase"] = "실패"
-
-    # 6. 노션 페이지 (NOTION env 있을 때만)
-    doc_link = None
-    if NOTION_API_KEY and NOTION_PAGE_ID:
-        log.info("[6/9] 노션 페이지 생성 시작...")
-        t = _time.time()
-        try:
-            doc_link = generate_notion_page(docs_blocks, articles, time_str, market_status_str)
-            log.info("[6/9] 노션 페이지 생성 완료 (%.1f초)", _time.time() - t)
-            results["노션"] = "성공"
-        except Exception:
-            log.exception("[6/9] 노션 페이지 생성 실패")
-            results["노션"] = "실패"
-    else:
-        log.info("[6/9] NOTION env 없음 — 스킵")
-        results["노션"] = "스킵"
 
     # 7. 카카오톡 (KAKAO env 있을 때만)
     if KAKAO_REST_API_KEY and (KAKAO_REFRESH_TOKEN_ENV or TOKEN_FILE.exists()):

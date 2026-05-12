@@ -2,15 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Pretendard 한국어 본문 폰트 (Google Fonts에 없어서 CDN으로 로드) */
+/* Pretendard — 한국어 본문 */
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css");
-/* Single Day 손글씨 폰트 — Vercel 빌드 환경에서 next/font 가 못 받아와서 CSS @import 로 로드 */
-@import url("https://fonts.googleapis.com/css2?family=Single+Day&display=swap");
 
 :root {
   --font-pretendard: "Pretendard Variable", Pretendard, -apple-system,
     BlinkMacSystemFont, "Apple SD Gothic Neo", system-ui, sans-serif;
-  --font-single-day: "Single Day", cursive;
 }
 
 html {
@@ -18,25 +15,23 @@ html {
 }
 
 body {
-  background-color: #faf3e0;
-  color: #1a1a1a;
+  background-color: #fafafa;
+  color: #0a0a0a;
   font-family: var(--font-pretendard);
   font-feature-settings: "ss01", "ss02";
-  letter-spacing: -0.01em;
+  letter-spacing: -0.011em;
+  text-rendering: optimizeLegibility;
 }
 
-/* 하이라이트 펜 효과 — 인사이트 강조용 */
-.pen-highlight {
-  background-image: linear-gradient(transparent 60%, #fffc4f 60%);
-  padding: 0 0.1em;
+/* iOS 안전 영역(노치/홈 인디케이터) 대응 */
+@supports (padding: max(0px)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 
-.pen-highlight-pink {
-  background-image: linear-gradient(transparent 60%, #ff4fa3 60%);
-  padding: 0 0.1em;
-}
-
-/* 가로 스크롤 (최근 브리핑) 스크롤바 숨김 */
+/* 가로 스크롤바 숨김 */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
