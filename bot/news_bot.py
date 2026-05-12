@@ -1359,7 +1359,10 @@ def _check_env(require_notion: bool = True, require_kakao: bool = True) -> None:
 
 
 def main() -> None:
-    _check_env()
+    # cloud 모드면 NOTION/KAKAO 옵셔널 (require_=False).
+    # 다른 모드(--now, --auth 등)는 기존대로 모두 필요.
+    cloud_mode = "cloud" in sys.argv
+    _check_env(require_notion=not cloud_mode, require_kakao=not cloud_mode)
 
     if "--auth" in sys.argv:
         log.info("카카오 인증 모드")
@@ -1394,8 +1397,6 @@ def main() -> None:
 
     if "cloud" in sys.argv:
         log.info("클라우드 모드 (GitHub Actions 진입점)")
-        # 사이트 전용일 수도 있으니 노션/카카오는 require_=False 로 검증
-        _check_env(require_notion=False, require_kakao=False)
         run_cloud()
         return
 
