@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+build/
+.env
+.env.local
+.env*.local
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+.vscode/
+.idea/
+__pycache__/
+*.pyc
+_previous_rss_attempt/

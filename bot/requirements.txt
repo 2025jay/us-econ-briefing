@@ -1,0 +1,12 @@
+requests
+anthropic
+pytz
+feedparser
+yfinance
+notion-client
+playwright
+supabase
+google-api-python-client
+google-auth
+google-auth-oauthlib
+apscheduler
