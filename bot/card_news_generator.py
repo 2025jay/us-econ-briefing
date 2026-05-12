@@ -82,9 +82,13 @@ def extract_card_news_data(docs_blocks: list) -> list:
                 "- 없으면 그 카테고리를 비우고, 실제 보도된 다른 중요 뉴스(예: M&A, 기업실적, 규제, 노동시장, ESG, 헬스케어)로 대체.\n"
                 "- tag는 항상 대문자 영문 14자 이내. 카테고리 이름을 유연하게 (예: BUZZFEED 매각이면 tag='MEDIA' 또는 'M&A').\n"
                 "- 절대 원문에 없는 사실/수치를 만들지 말 것. 카테고리 채우려고 가공/추측 금지.\n\n"
-                "규칙:\n"
-                "- title은 한 줄 40자 이내 (줄바꿈 금지).\n"
-                "- tldr은 공백 포함 15자 이내 (한국어 기준). 한 줄 디자인이 깨지지 않도록 반드시 준수.\n"
+                "엄격한 길이 규칙 (반드시 카운트해서 준수, 글자 잘림 방지):\n"
+                "- title은 한 줄 **28자 이내** (한글 기준, 공백 포함, 줄바꿈 금지). 모든 카드 공통.\n"
+                "- tldr은 공백 포함 **12자 이내** (한국어 기준). 짧을수록 좋음.\n"
+                "- body는 100~200자. 너무 길면 카드 밖으로 넘침.\n"
+                "- stat.value는 8자 이내, stat.label은 10자 이내.\n"
+                "- 출력 전 본인이 글자수 직접 세서 확인할 것.\n\n"
+                "추가 규칙:\n"
                 "- highlight는 title 안에 정확히 포함된 substring이어야 함 (JS에서 replace로 강조 처리됨).\n"
                 "- body는 원문의 사실과 수치만 전달. '주목하세요', '사야 할 때', '지금이 기회', '수혜를 입을 수 있습니다', '날아오를 가능성' 같은 투자 조언/예측/권유 표현 절대 금지.\n"
                 "- body는 반드시 정중한 존댓말(~입니다, ~나타났습니다, ~보입니다). 기자체(~했다, ~이다) 절대 금지.\n"
@@ -183,6 +187,43 @@ TAG_FALLBACKS = {
 _USED_URLS_THIS_RUN: set = set()
 
 GENERIC_FALLBACKS = ["business", "finance", "technology", "global economy", "stock market"]
+
+
+def _generate_placeholder_image(index: int, label: str = "") -> str:
+    """Unsplash 모두 실패 시 그라데이션 배경 PNG로 폴백.
+    카드에 빈 공간 안 생기게 photo_{index}.jpg 자리 채움.
+    """
+    try:
+        from PIL import Image, ImageDraw
+    except ImportError:
+        log.warning("Pillow 미설치 — placeholder 생략")
+        return ""
+
+    # 카드별로 다른 그라데이션 톤
+    palettes = [
+        ((255, 209, 102), (235, 87, 87)),    # 따뜻한 노랑→레드
+        ((142, 197, 252), (224, 195, 252)),  # 시원한 파랑→보라
+        ((230, 230, 230), (180, 180, 180)),  # 뉴트럴 그레이
+        ((253, 187, 168), (240, 152, 178)),  # 핑크 그라데이션
+        ((159, 226, 191), (87, 199, 130)),   # 그린 그라데이션
+    ]
+    c1, c2 = palettes[index % len(palettes)]
+
+    size = 800
+    img = Image.new("RGB", (size, size), c1)
+    draw = ImageDraw.Draw(img)
+    # 수직 그라데이션
+    for y in range(size):
+        ratio = y / size
+        r = int(c1[0] * (1 - ratio) + c2[0] * ratio)
+        g = int(c1[1] * (1 - ratio) + c2[1] * ratio)
+        b = int(c1[2] * (1 - ratio) + c2[2] * ratio)
+        draw.line([(0, y), (size, y)], fill=(r, g, b))
+
+    img_path = CARD_OUTPUT_DIR / f"photo_{index}.jpg"
+    img.save(img_path, "JPEG", quality=85)
+    log.info("[card %d] placeholder 그라데이션 생성: %s", index + 1, img_path.name)
+    return img_path.name
 
 
 def fetch_unsplash_image(keywords: str, index: int, card_tag: str = "") -> str:
@@ -290,8 +331,8 @@ def fetch_unsplash_image(keywords: str, index: int, card_tag: str = "") -> str:
                         card_label, stage, attempt_q, exc)
             continue
 
-    log.error("%s 모든 Unsplash 검색 시도 실패", card_label)
-    return ""
+    log.warning("%s 모든 Unsplash 검색 실패 — placeholder 그라데이션으로 대체", card_label)
+    return _generate_placeholder_image(index)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

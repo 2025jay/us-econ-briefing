@@ -1,6 +1,7 @@
 requests
 anthropic
 pytz
+Pillow
 feedparser
 yfinance
 notion-client
