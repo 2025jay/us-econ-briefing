@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>미국 경제 AI 브리핑 · 카드뉴스 v2 (Editorial Magazine)</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:#0b0b0d; color:#eaeaea; font-family:'Pretendard', sans-serif; min-height:100vh; }
+  .app { padding: 28px 24px 80px; max-width: 1500px; margin: 0 auto; }
+  .top {
+    display:flex; justify-content:space-between; align-items:flex-end; gap:20px;
+    padding: 10px 2px 24px; border-bottom:1px solid #222; margin-bottom:28px;
+  }
+  .top h1 { margin:0; font-size:24px; font-weight:800; letter-spacing:-0.02em; }
+  .top .sub { color:#888; font-size:13px; margin-top:6px; }
+  .top .meta { font-family:'JetBrains Mono', monospace; font-size:11px; color:#666; }
+  .stage-wrap {
+    display:grid; grid-template-columns: 1fr; gap:16px;
+    background:#111; border:1px solid #1e1e21; border-radius:20px; padding:20px;
+  }
+  .card-grid {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(420px, 1fr));
+    gap:14px;
+  }
+  .card-cell { position:relative; }
+  .card-idx {
+    position:absolute; top:8px; left:10px; z-index:20;
+    font-family:'JetBrains Mono', monospace; font-size:10px; color:#fff;
+    background:rgba(0,0,0,0.5); padding:3px 8px; border-radius:999px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="top">
+    <div>
+      <h1>미국 경제 AI 브리핑 — 카드뉴스 v2</h1>
+      <div class="sub">Editorial Magazine · 7장 (Cover + News 5 + CTA)</div>
+    </div>
+    <div class="meta">v.02 · 2026.05.15</div>
+  </div>
+
+  <div class="stage-wrap">
+    <div class="card-grid" id="card-grid"></div>
+  </div>
+</div>
+
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+
+<script type="text/babel" data-presets="env,react">
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 데이터 — card_news_generator.py가 정규식으로 치환
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const BRIEFING_META = {
+  date: "05.15 FRI",
+  time: "08:30 KST",
+  brand: "The U.S. Econ Briefing",
+  tagline: "너만 모르는 5분 국제 경제 브리핑",
+  edition: "MAY 15, 2026 · MORNING",
+  vol: "VOL.",
+};
+
+const NEWS_ITEMS = [
+  {
+    n: "01", tag: "MARKETS",
+    title: "S&P 500\n2주 연속 신고가",
+    highlight: "신고가",
+    source: "S&P 500 Hits Fresh All-Time High",
+    outlet: "Bloomberg",
+    tldr: "증시 사상 최고",
+    body: "S&P 500 지수가 이번 주 두 번째 사상 최고치를 경신했습니다. AI 관련주가 지수 상승을 주도하며 시장 심리가 회복되는 모습입니다.",
+    stat: { label: "S&P 500", value: "5,847", unit: "+0.42%", note: "" },
+    imageCaption: "trading floor",
+    image: "photo_0.jpg",
+  },
+];
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 디자인 토큰
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const ed = {
+  paper: "#F8F7F4",
+  ink: "#141414",
+  gray: "#787878",
+  hairline: "#C8C8C8",
+  accent: "#B22234",
+  white: "#FFFFFF",
+  photoBg: "#E1E1E1",
+};
+const fonts = {
+  serif: "'Playfair Display', serif",
+  sans: "'Pretendard', sans-serif",
+  mono: "'JetBrains Mono', monospace",
+};
+
+// 1080x1080 카드 베이스 — container query units(cqw)로 모든 치수 스케일
+const cardBase = (bg) => ({
+  position: "relative",
+  width: "1080px",
+  height: "1080px",
+  background: bg || ed.paper,
+  color: ed.ink,
+  fontFamily: fonts.sans,
+  containerType: "inline-size",
+  overflow: "hidden",
+});
+
+// 작은 helper: 빨간 accent line
+const AccentLine = ({ width = "60px", color = ed.accent }) => (
+  <div style={{ width, height: "4px", background: color }} />
+);
+
+// PHOTO 박스 (img 로드 실패 시 placeholder 표시)
+const PhotoBox = ({ src, caption, w = "960px", h = "460px" }) => (
+  <div style={{
+    position: "relative", width: w, height: h,
+    background: ed.photoBg, overflow: "hidden",
+  }}>
+    {src ? (
+      <img src={src} alt={caption || ""} style={{
+        width: "100%", height: "100%", objectFit: "cover", display: "block",
+      }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+    ) : null}
+    {/* placeholder text — 사진 없거나 로드 실패 시 보임 */}
+    <div style={{
+      position: "absolute", inset: 0,
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      color: "#A0A0A0", fontFamily: fonts.serif, fontSize: "48px",
+      pointerEvents: "none", zIndex: src ? -1 : 1,
+    }}>
+      <div>📷 PHOTO</div>
+      {caption ? (
+        <div style={{ fontFamily: fonts.mono, fontSize: "24px", marginTop: "12px" }}>
+          {caption}
+        </div>
+      ) : null}
+    </div>
+  </div>
+);
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CARD 1: COVER
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const Cover = () => (
+  <div style={cardBase(ed.paper)}>
+    {/* 상단 라인 + 메타 */}
+    <div style={{ position: "absolute", top: "60px", left: "60px", right: "60px", height: "4px", background: ed.ink }} />
+    <div style={{
+      position: "absolute", top: "80px", left: "60px",
+      fontFamily: fonts.mono, fontSize: "22px", color: ed.gray, letterSpacing: "0.08em",
+    }}>{BRIEFING_META.vol}</div>
+    <div style={{
+      position: "absolute", top: "80px", right: "60px",
+      fontFamily: fonts.mono, fontSize: "22px", color: ed.gray, letterSpacing: "0.08em",
+    }}>{BRIEFING_META.edition}</div>
+
+    {/* 메인 헤드라인 */}
+    <div style={{
+      position: "absolute", top: "220px", left: "60px", right: "60px",
+      fontFamily: fonts.serif, fontWeight: 900,
+      fontSize: "160px", lineHeight: 1.05, letterSpacing: "-0.03em",
+      color: ed.ink,
+    }}>
+      The U.S. Econ<br />Briefing.
+    </div>
+
+    {/* accent line + 영문 부제 */}
+    <div style={{ position: "absolute", top: "580px", left: "60px" }}>
+      <AccentLine width="100px" />
+    </div>
+    <div style={{
+      position: "absolute", top: "610px", left: "60px", right: "60px",
+      fontFamily: fonts.serif, fontSize: "32px", color: "#3C3C3C", lineHeight: 1.4,
+    }}>
+      Daily intelligence on U.S. capital markets,
+    </div>
+
+    {/* 한국어 태그라인 */}
+    <div style={{
+      position: "absolute", top: "760px", left: "60px",
+      fontFamily: fonts.sans, fontWeight: 700, fontSize: "36px", color: ed.ink,
+      letterSpacing: "-0.02em",
+    }}>
+      {BRIEFING_META.tagline}
+    </div>
+
+    {/* 좌하: cover photo */}
+    <PhotoBox src={(NEWS_ITEMS[0] && NEWS_ITEMS[0].image) || ""}
+              caption="cover photo" w="600px" h="200px" />
+    <div style={{ position: "absolute", top: "840px", left: "60px", width: "600px", height: "200px" }} />
+    <div style={{ position: "absolute", top: "840px", left: "60px", display: "none" }} />
+
+    {/* 우하: TODAY 인덱스 박스 */}
+    <div style={{
+      position: "absolute", top: "840px", left: "700px",
+      width: "320px", height: "200px",
+      background: ed.ink, color: ed.white,
+      padding: "20px",
+    }}>
+      <div style={{
+        fontFamily: fonts.mono, fontWeight: 700, fontSize: "24px",
+        letterSpacing: "0.08em", marginBottom: "12px",
+      }}>TODAY</div>
+      {NEWS_ITEMS.slice(0, 5).map((it, i) => (
+        <div key={i} style={{
+          fontFamily: fonts.mono, fontSize: "18px", lineHeight: 1.7,
+        }}>
+          {(it.n || String(i+1).padStart(2, "0"))} · {it.tag || ""}
+        </div>
+      ))}
+    </div>
+
+    {/* 하단 라인 */}
+    <div style={{ position: "absolute", bottom: "20px", left: "60px", right: "60px", height: "2px", background: ed.ink }} />
+  </div>
+);
+
+// Cover photo 박스를 절대 위치로 다시 (PhotoBox 컴포넌트가 absolute 설정 안 되어서 분리)
+const CoverFixed = () => (
+  <div style={cardBase(ed.paper)}>
+    <div style={{ position: "absolute", top: "60px", left: "60px", right: "60px", height: "4px", background: ed.ink }} />
+    <div style={{ position: "absolute", top: "80px", left: "60px", fontFamily: fonts.mono, fontSize: "22px", color: ed.gray, letterSpacing: "0.08em" }}>{BRIEFING_META.vol}</div>
+    <div style={{ position: "absolute", top: "80px", right: "60px", fontFamily: fonts.mono, fontSize: "22px", color: ed.gray, letterSpacing: "0.08em" }}>{BRIEFING_META.edition}</div>
+
+    <div style={{ position: "absolute", top: "220px", left: "60px", right: "60px", fontFamily: fonts.serif, fontWeight: 900, fontSize: "160px", lineHeight: 1.05, letterSpacing: "-0.03em", color: ed.ink }}>
+      The U.S. Econ<br />Briefing.
+    </div>
+
+    <div style={{ position: "absolute", top: "580px", left: "60px", width: "100px", height: "4px", background: ed.accent }} />
+    <div style={{ position: "absolute", top: "610px", left: "60px", right: "60px", fontFamily: fonts.serif, fontSize: "32px", color: "#3C3C3C", lineHeight: 1.4 }}>
+      Daily intelligence on U.S. capital markets,
+    </div>
+
+    <div style={{ position: "absolute", top: "760px", left: "60px", fontFamily: fonts.sans, fontWeight: 700, fontSize: "36px", color: ed.ink, letterSpacing: "-0.02em" }}>
+      {BRIEFING_META.tagline}
+    </div>
+
+    {/* 좌하: cover photo (절대 위치 wrapper) */}
+    <div style={{ position: "absolute", top: "840px", left: "60px", width: "600px", height: "200px", background: ed.photoBg, overflow: "hidden" }}>
+      {(NEWS_ITEMS[0] && NEWS_ITEMS[0].image) ? (
+        <img src={NEWS_ITEMS[0].image} alt="cover"
+             style={{ width:"100%", height:"100%", objectFit:"cover" }}
+             onError={(e)=>{ e.currentTarget.style.display="none"; }} />
+      ) : null}
+      <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#A0A0A0", fontFamily: fonts.serif, fontSize: "36px", pointerEvents:"none" }}>
+        📷 cover photo
+      </div>
+    </div>
+
+    {/* 우하: TODAY 인덱스 박스 */}
+    <div style={{ position: "absolute", top: "840px", left: "700px", width: "320px", height: "200px", background: ed.ink, color: ed.white, padding: "20px" }}>
+      <div style={{ fontFamily: fonts.mono, fontWeight: 700, fontSize: "22px", letterSpacing: "0.08em", marginBottom: "10px", color: "#fff" }}>TODAY</div>
+      {NEWS_ITEMS.slice(0, 5).map((it, i) => (
+        <div key={i} style={{ fontFamily: fonts.mono, fontSize: "17px", lineHeight: 1.7, color: "#fff" }}>
+          {(it.n || String(i+1).padStart(2, "0"))} · {(it.tag || "").toUpperCase()}
+        </div>
+      ))}
+    </div>
+
+    <div style={{ position: "absolute", bottom: "20px", left: "60px", right: "60px", height: "2px", background: ed.ink }} />
+  </div>
+);
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CARDS 2-6: NEWS 01-05 — 동일 템플릿, 데이터만 다름
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const NewsCard = ({ idx }) => {
+  const item = NEWS_ITEMS[idx] || {};
+  const tag = (item.tag || "").toUpperCase();
+  const n = item.n || String(idx + 1).padStart(2, "0");
+  return (
+    <div style={cardBase(ed.paper)}>
+      {/* 상단 라인 */}
+      <div style={{ position: "absolute", top: "60px", left: "60px", right: "60px", height: "2px", background: ed.ink }} />
+      <div style={{
+        position: "absolute", top: "80px", left: "60px",
+        fontFamily: fonts.sans, fontWeight: 700, fontSize: "22px", color: ed.ink,
+        letterSpacing: "0.08em",
+      }}>{tag} · No.{n}</div>
+      <div style={{
+        position: "absolute", top: "80px", right: "60px",
+        fontFamily: fonts.sans, fontWeight: 400, fontSize: "22px", color: ed.ink,
+        letterSpacing: "0.08em",
+      }}>{BRIEFING_META.edition.split(" · ")[0]}</div>
+
+      {/* 사진 */}
+      <div style={{
+        position: "absolute", top: "130px", left: "60px",
+        width: "960px", height: "460px",
+        background: ed.photoBg, overflow: "hidden",
+      }}>
+        {item.image ? (
+          <img src={item.image} alt={item.imageCaption || ""}
+               style={{ width:"100%", height:"100%", objectFit:"cover" }}
+               onError={(e)=>{ e.currentTarget.style.display="none"; }} />
+        ) : null}
+        <div style={{
+          position:"absolute", inset:0,
+          display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+          color:"#A0A0A0", pointerEvents:"none",
+        }}>
+          <div style={{ fontFamily: fonts.serif, fontSize: "48px" }}>📷 PHOTO</div>
+          {item.imageCaption ? (
+            <div style={{ fontFamily: fonts.mono, fontSize: "24px", marginTop: "12px" }}>
+              {item.imageCaption}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* 사진 캡션 */}
+      <div style={{
+        position: "absolute", top: "600px", left: "60px",
+        fontFamily: fonts.mono, fontSize: "18px", color: ed.gray,
+      }}>Photo · {item.imageCaption || ""}</div>
+
+      {/* 큰 한글 제목 (2줄) */}
+      <div style={{
+        position: "absolute", top: "640px", left: "60px", right: "60px",
+        fontFamily: fonts.sans, fontWeight: 900, fontSize: "78px",
+        lineHeight: 1.15, letterSpacing: "-0.02em", color: ed.ink,
+        whiteSpace: "pre-wrap",
+      }}>{item.title || ""}</div>
+
+      {/* 빨간 accent line */}
+      <div style={{
+        position: "absolute", top: "870px", left: "60px",
+        width: "60px", height: "4px", background: ed.accent,
+      }} />
+
+      {/* 본문 */}
+      <div style={{
+        position: "absolute", top: "890px", left: "60px", right: "60px",
+        fontFamily: fonts.sans, fontWeight: 400, fontSize: "22px",
+        color: "#3C3C3C", lineHeight: 1.6,
+      }}>{item.body || ""}</div>
+
+      {/* 하단 라인 + stat / outlet */}
+      <div style={{ position: "absolute", top: "1010px", left: "60px", right: "60px", height: "1px", background: ed.hairline }} />
+      <div style={{
+        position: "absolute", top: "1030px", left: "60px",
+        fontFamily: fonts.mono, fontSize: "18px", color: ed.gray,
+        letterSpacing: "0.06em",
+      }}>{(item.stat && item.stat.label) || ""}</div>
+      <div style={{
+        position: "absolute", top: "1054px", left: "60px",
+        fontFamily: fonts.serif, fontWeight: 700, fontSize: "22px", color: ed.ink,
+      }}>
+        {(item.stat && item.stat.value) || ""}
+        {item.stat && item.stat.unit ? ` · ${item.stat.unit}` : ""}
+      </div>
+      <div style={{
+        position: "absolute", top: "1030px", right: "60px",
+        fontFamily: fonts.mono, fontWeight: 700, fontSize: "18px", color: ed.ink,
+        letterSpacing: "0.06em",
+      }}>{(item.outlet || "").toUpperCase()}</div>
+    </div>
+  );
+};
+
+const News01 = () => <NewsCard idx={0} />;
+const News02 = () => <NewsCard idx={1} />;
+const News03 = () => <NewsCard idx={2} />;
+const News04 = () => <NewsCard idx={3} />;
+const News05 = () => <NewsCard idx={4} />;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CARD 7: CTA — 갓생습관 앱 가입 유도
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const Cta = () => (
+  <div style={cardBase(ed.ink)}>
+    {/* 상단 흰 가는 라인 */}
+    <div style={{ position: "absolute", top: "60px", left: "60px", right: "60px", height: "4px", background: ed.white }} />
+
+    {/* 거대 FIN. */}
+    <div style={{
+      position: "absolute", top: "100px", left: "60px",
+      fontFamily: fonts.serif, fontWeight: 900, fontSize: "340px",
+      letterSpacing: "-0.05em", color: ed.white, lineHeight: 1,
+    }}>FIN.</div>
+
+    {/* 빨간 accent line */}
+    <div style={{
+      position: "absolute", top: "490px", left: "60px",
+      width: "100px", height: "4px", background: ed.accent,
+    }} />
+
+    {/* 한 줄 메시지 */}
+    <div style={{
+      position: "absolute", top: "520px", left: "60px", right: "60px",
+      fontFamily: fonts.serif, fontWeight: 700, fontSize: "60px",
+      color: ed.white, lineHeight: 1.15,
+    }}>Delivered every morning.</div>
+
+    {/* 하얀 카피 박스 — 갓생습관 hook */}
+    <div style={{
+      position: "absolute", top: "720px", left: "60px",
+      width: "960px", height: "240px",
+      background: ed.white, padding: "40px",
+    }}>
+      <div style={{
+        fontFamily: fonts.sans, fontWeight: 700, fontSize: "32px",
+        color: ed.ink, lineHeight: 1.4, letterSpacing: "-0.02em",
+      }}>갓생 사는 사람들은 이 어플 깔지 마세요.</div>
+      <div style={{
+        fontFamily: fonts.sans, fontWeight: 400, fontSize: "22px",
+        color: "#5C5C5C", marginTop: "8px", lineHeight: 1.5,
+      }}>(복습 기능 토익 단어장 무료, 12시간 국제 뉴스 정리 무료)</div>
+      <div style={{
+        position: "absolute", right: "40px", bottom: "40px",
+        fontFamily: fonts.serif, fontWeight: 700, fontSize: "26px",
+        color: ed.ink, fontStyle: "italic",
+      }}>App Store · Play Store  "갓생습관"</div>
+    </div>
+
+    {/* 하단 흰 라인 + NEXT EDITION 푸터 */}
+    <div style={{ position: "absolute", bottom: "60px", left: "60px", right: "60px", height: "2px", background: ed.white }} />
+    <div style={{
+      position: "absolute", bottom: "30px", left: "60px",
+      fontFamily: fonts.mono, fontSize: "18px", color: "#B4B4B4",
+      letterSpacing: "0.08em",
+    }}>NEXT EDITION TOMORROW 08:30 KST</div>
+  </div>
+);
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 마운트 — Cover + News01~05 + CTA
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const ALL_CARDS = [CoverFixed, News01, News02, News03, News04, News05, Cta];
+
+// generator (Playwright) 가 마운트 + 캡처하기 위한 훅
+window.PopOption = { cards: ALL_CARDS };
+window.NEWS_ITEMS = NEWS_ITEMS;
+
+// 미리보기 — 7장을 페이지에 렌더 (브라우저로 열었을 때 확인용)
+const grid = document.getElementById("card-grid");
+ALL_CARDS.forEach((C, i) => {
+  const cell = document.createElement("div");
+  cell.className = "card-cell";
+  const idx = document.createElement("div");
+  idx.className = "card-idx";
+  idx.textContent = `${(i+1).toString().padStart(2,"0")} / 07`;
+  cell.appendChild(idx);
+  const mount = document.createElement("div");
+  mount.style.cssText = "transform-origin:top left;transform:scale(0.4);width:1080px;height:1080px;";
+  cell.appendChild(mount);
+  // wrapper 사이즈 (스케일 적용 후)
+  cell.style.cssText = "width:432px;height:432px;overflow:hidden;background:#222;";
+  cell.insertBefore(idx, mount);
+  cell.appendChild(mount);
+  grid.appendChild(cell);
+  ReactDOM.createRoot(mount).render(React.createElement(C));
+});
+
+</script>
+
+</body>
+</html>

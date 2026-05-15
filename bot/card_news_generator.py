@@ -31,8 +31,30 @@ BASE_DIR = Path(__file__).parent
 CARD_OUTPUT_DIR = BASE_DIR / "card_news_output"
 CARD_OUTPUT_DIR.mkdir(exist_ok=True)
 
-DESIGN_HTML_PATH = BASE_DIR / "cardnews" / "index.html"
+# ★ v1/v2 디자인 로테이션 — 짝수일(KST)=v1, 홀수일=v2
+#   v1: cardnews/index.html         (Y2K Sticker Pop, 사진 ✓)
+#   v2: cardnews_v2/index.html      (Editorial Magazine, 사진 ✓)
+DESIGN_HTML_PATHS = {
+    "v1_sticker":   BASE_DIR / "cardnews" / "index.html",
+    "v2_editorial": BASE_DIR / "cardnews_v2" / "index.html",
+}
 PREVIEW_HTML_PATH = CARD_OUTPUT_DIR / "preview.html"
+
+
+def _select_design_version(date) -> tuple:
+    """KST 날짜 기준 짝/홀로 v1/v2 선택. 파일 없으면 v1으로 폴백.
+
+    반환: (version_str, html_path)
+    """
+    is_even = (date.day % 2 == 0)
+    version = "v1_sticker" if is_even else "v2_editorial"
+    path = DESIGN_HTML_PATHS[version]
+    if not path.exists():
+        log.warning("디자인 %s 파일 없음(%s) — v1_sticker 폴백", version, path)
+        version = "v1_sticker"
+        path = DESIGN_HTML_PATHS[version]
+    log.info("디자인 버전 선택: %s (day=%d, even=%s)", version, date.day, is_even)
+    return version, path
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
 UNSPLASH_ACCESS_KEY = os.environ.get("UNSPLASH_ACCESS_KEY", "").strip()
@@ -64,24 +86,28 @@ def extract_card_news_data(docs_blocks: list) -> list:
                 "[\n"
                 "  {\n"
                 '    "n": "01",\n'
-                '    "tag": "ENERGY",\n'
+                '    "tag": "MARKETS",\n'
                 '    "title": "한국어 헤드라인 (40자 이내, 한 줄)",\n'
                 '    "highlight": "title 안에 포함된 강조 substring (2~8자)",\n'
                 '    "source": "원문 영문 기사 제목 (풀 문장)",\n'
                 '    "outlet": "매체명 (예: Bloomberg)",\n'
                 '    "tldr": "한 줄 요약 15자 이내 (공백 포함, 한국어 기준)",\n'
                 '    "body": "비서가 독자께 직접 말씀드리듯 정중한 존댓말 본문 100~260자. 핵심 사실 → 수치/데이터 → 배경 맥락 → 주목하실 영향 순서로.",\n'
-                '    "stat": { "label": "지표 라벨 8자 이내", "value": "$3+ / 04.21 등 핵심 수치", "unit": "단위 또는 부가설명", "note": "짧은 비고 (없으면 빈 문자열)" },\n'
-                '    "imageCaption": "영문 폴라로이드 캡션 28자 이내 (예: Strait of Hormuz)",\n'
+                '    "stat": { "label": "지표 라벨 8자 이내", "value": "핵심 수치 (예: 5234 / +1.2% / 04.21)", "unit": "단위 또는 부가설명", "note": "짧은 비고 (없으면 빈 문자열)" },\n'
+                '    "imageCaption": "영문 폴라로이드 캡션 28자 이내 (해당 뉴스의 시각적 키워드)",\n'
                 '    "unsplash_keywords": "시각적 구체 명사 2~4개, 쉼표 구분, 영어 소문자. imageCaption과 같은 시각 도메인. 규칙은 하단 참고."\n'
                 "  }\n"
                 "]\n\n"
                 "★ 카테고리 선정 원칙 — 실제 뉴스에 맞게 자유롭게:\n"
                 "- 우선순위: 오늘 가장 중요한 5개 뉴스. 카테고리 슬롯에 억지로 끼워맞추지 말 것.\n"
-                "- 만약 오늘 에너지/지정학/FED/빅테크/증시 골고루 있으면 그 순서로 배치 권장.\n"
-                "- 없으면 그 카테고리를 비우고, 실제 보도된 다른 중요 뉴스(예: M&A, 기업실적, 규제, 노동시장, ESG, 헬스케어)로 대체.\n"
-                "- tag는 항상 대문자 영문 14자 이내. 카테고리 이름을 유연하게 (예: BUZZFEED 매각이면 tag='MEDIA' 또는 'M&A').\n"
+                "- 카테고리 풀(자유 선택): MARKETS, FED, MACRO, BIG TECH, AI, SEMICONDUCTOR, ENERGY, GEOPOLITICS, M&A, EARNINGS, REGULATION, LABOR, HEALTHCARE, MEDIA, REAL ESTATE, CRYPTO 등.\n"
+                "- tag는 항상 대문자 영문 14자 이내. 오늘 뉴스의 실제 주제에 맞게 자유 선택.\n"
                 "- 절대 원문에 없는 사실/수치를 만들지 말 것. 카테고리 채우려고 가공/추측 금지.\n\n"
+                "★★ 다양성 강제 규칙 (반드시 준수 — 매일 같은 주제가 1번 카드에 오는 것을 막기 위함):\n"
+                "- 1번 카드(n='01')는 오늘 브리핑에서 가장 중요하고 가장 새로운(시의성 있는) 뉴스로 선정.\n"
+                "- 같은 주제(특히 호르무즈/이란/원유/중동 등)가 며칠씩 1번에 반복되는 패턴을 의도적으로 깨고, 오늘의 헤드라인 중 가장 임팩트 있는 것을 골라.\n"
+                "- 5개 카드의 카테고리(tag)가 서로 겹치지 않게 분산. 같은 tag 두 번 금지.\n"
+                "- 임의 우선순위(에너지 우선 등) 절대 금지 — 진짜 오늘 가장 중요한 뉴스부터.\n\n"
                 "엄격한 길이 규칙 (반드시 카운트해서 준수, 글자 잘림 방지):\n"
                 "- title은 한 줄 **28자 이내** (한글 기준, 공백 포함, 줄바꿈 금지). 모든 카드 공통.\n"
                 "- tldr은 공백 포함 **12자 이내** (한국어 기준). 짧을수록 좋음.\n"
@@ -129,11 +155,13 @@ def extract_card_news_data(docs_blocks: list) -> list:
                 "  * imageCaption(영문)과 같은 시각 도메인을 유지.\n"
                 "\n"
                 "  * 카테고리별 권장 예시 (참고용, 그대로 복붙 말고 기사에 맞게 변형):\n"
-                "      ENERGY 호르무즈 폐쇄 → 'oil tanker, oil refinery, container ship'\n"
-                "      GEOPOLITICS 군사 충돌 → 'aircraft carrier, military jet, naval ship'\n"
+                "      MARKETS 증시/밸류 → 'stock chart, trading floor, financial graph'\n"
                 "      FED 청문회/정책 → 'capitol building, federal reserve, official podium'\n"
                 "      BIG TECH AI 칩 → 'computer chip, semiconductor wafer, data center'\n"
-                "      MARKETS 증시/밸류 → 'stock chart, trading floor, financial graph'\n"
+                "      ENERGY 원유/가스 → 'oil refinery, oil tanker, container ship'\n"
+                "      GEOPOLITICS 군사 → 'aircraft carrier, military jet, naval ship'\n"
+                "      M&A 인수합병 → 'office building, handshake business, corporate tower'\n"
+                "      EARNINGS 실적 → 'office building, financial graph, business chart'\n"
                 "- n은 \"01\" ~ \"05\" 고정, 정확히 5개만 출력."
             ),
         }],
@@ -397,12 +425,18 @@ def _patch_photoslot_src(html: str) -> str:
     return html
 
 
-def build_preview_html(cards_data: list, date_str: str) -> Path:
-    """cardnews/index.html 을 읽어 데이터/이미지/날짜를 주입한 preview.html 을 생성."""
-    if not DESIGN_HTML_PATH.exists():
-        raise FileNotFoundError(f"디자인 파일 없음: {DESIGN_HTML_PATH}")
+def build_preview_html(cards_data: list, date_str: str, version: str = None, design_path: Path = None) -> Path:
+    """디자인 HTML 을 읽어 데이터/이미지/날짜를 주입한 preview.html 을 생성.
 
-    html = DESIGN_HTML_PATH.read_text(encoding="utf-8")
+    version/design_path 가 None 이면 KST 날짜로 자동 선택 (짝수일=v1, 홀수일=v2).
+    """
+    if version is None or design_path is None:
+        version, design_path = _select_design_version(datetime.now())
+
+    if not design_path.exists():
+        raise FileNotFoundError(f"디자인 파일 없음: {design_path}")
+
+    html = design_path.read_text(encoding="utf-8")
 
     # 1) NEWS_ITEMS 주입 (5개 뉴스 카드 데이터 + image 필드)
     news_items = []
@@ -441,13 +475,24 @@ def build_preview_html(cards_data: list, date_str: str) -> Path:
     time_part_match = re.search(r'(\d{2}:\d{2}\s+ET)', date_str)
     time_part = time_part_match.group(1) if time_part_match else ""
 
-    meta = {
-        "date": short_cover_date,
-        "time": time_part,
-        "brand": "미국 경제 AI 브리핑",
-        "tagline": "AI가 골라주는 진짜 핵심만",
-        "kakaoLabel": "KAKAO OPENCHAT",
-    }
+    # v2는 BRIEFING_META에 edition/vol/tagline 등 자체 키를 쓰므로 머지
+    if version == "v2_editorial":
+        meta = {
+            "date": short_cover_date,
+            "time": time_part,
+            "brand": "The U.S. Econ Briefing",
+            "tagline": "너만 모르는 5분 국제 경제 브리핑",
+            "edition": f"{datetime.now().strftime('%b %d, %Y').upper()} · MORNING",
+            "vol": "VOL.",
+        }
+    else:
+        meta = {
+            "date": short_cover_date,
+            "time": time_part,
+            "brand": "미국 경제 AI 브리핑",
+            "tagline": "AI가 골라주는 진짜 핵심만",
+            "kakaoLabel": "KAKAO OPENCHAT",
+        }
     meta_json = json.dumps(meta, ensure_ascii=False, indent=2)
     meta_replacement = f"const BRIEFING_META = {meta_json};"
     html, n2 = re.subn(
@@ -460,7 +505,14 @@ def build_preview_html(cards_data: list, date_str: str) -> Path:
     if n2 != 1:
         log.warning("BRIEFING_META 블록을 찾지 못함")
 
-    # 3) Cover 상단 배지의 하드코딩 날짜 ("DAILY · 04.19 SUN") → 오늘 날짜
+    # ───── 이하 v1 전용 패치들 (PopNews* 컴포넌트, 하드코딩 리터럴 치환). v2는 React가 NEWS_ITEMS를 직접 사용하므로 불필요.
+    if version != "v1_sticker":
+        log.info("v2_editorial — v1 전용 패치(_patch_photoslot_src, date pill, sticker, 폰트) 스킵")
+        PREVIEW_HTML_PATH.write_text(html, encoding="utf-8")
+        log.info("preview.html 생성: %s (version=%s)", PREVIEW_HTML_PATH, version)
+        return PREVIEW_HTML_PATH
+
+    # 3) Cover 상단 배지의 하드코딩 날짜 ("DAILY · 04.19 SUN") → 오늘 날짜  [v1만]
     html, n3 = re.subn(
         r'DAILY · \d{2}\.\d{2}\s+[A-Z]{3}',
         f'DAILY · {short_cover_date}',
@@ -471,10 +523,10 @@ def build_preview_html(cards_data: list, date_str: str) -> Path:
     else:
         log.warning("Cover 날짜 문자열을 찾지 못함 (디자인이 바뀌었을 수 있음)")
 
-    # 4) PopNews01~05 의 PhotoSlot 에 src={item.image} 주입
+    # 4) PopNews01~05 의 PhotoSlot 에 src={item.image} 주입  [v1만]
     html = _patch_photoslot_src(html)
 
-    # 5) PopNews03 파란 date pill — "📅 04.21 MON · 10AM ET" 리터럴을 cards_data[2].stat 으로 치환
+    # 5) PopNews03 파란 date pill — "📅 04.21 MON · 10AM ET" 리터럴을 cards_data[2].stat 으로 치환  [v1만]
     if len(cards_data) >= 3:
         stat3 = cards_data[2].get("stat") or {}
         new_pill = f"📅 {stat3.get('value', '')} {stat3.get('unit', '')}".strip()
@@ -486,7 +538,7 @@ def build_preview_html(cards_data: list, date_str: str) -> Path:
     else:
         log.warning("cards_data 길이 %d — PopNews03 date pill 치환 스킵", len(cards_data))
 
-    # 6) PopNews04 라임 sticker — "🤖 AI CHIP" 리터럴을 cards_data[3].stat.label 로 치환
+    # 6) PopNews04 라임 sticker — "🤖 AI CHIP" 리터럴을 cards_data[3].stat.label 로 치환  [v1만]
     if len(cards_data) >= 4:
         stat4 = cards_data[3].get("stat") or {}
         new_sticker = f"🤖 {stat4.get('label', '')}".strip()
@@ -513,7 +565,7 @@ def build_preview_html(cards_data: list, date_str: str) -> Path:
         log.info("PopNews04 주황 박스 폰트 사이즈 치환 완료: 4.6cqw → 3.4cqw")
 
     PREVIEW_HTML_PATH.write_text(html, encoding="utf-8")
-    log.info("preview.html 생성: %s", PREVIEW_HTML_PATH)
+    log.info("preview.html 생성: %s (version=%s)", PREVIEW_HTML_PATH, version)
     return PREVIEW_HTML_PATH
 
 

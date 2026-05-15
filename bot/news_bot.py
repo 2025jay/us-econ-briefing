@@ -1175,9 +1175,11 @@ def run_cloud() -> None:
     }
 
     # ── 사이트 세션 결정 ──
+    # ★ 정책: morning/evening 모두 사이트·노션 갱신. 카드뉴스/Gmail만 morning 전용(API 절감).
     from supabase_writer import get_site_session, upsert_briefing
     session_date, session_time = get_site_session(now_kst)
-    log.info("사이트 세션: %s/%s (KST 기준)", session_date, session_time)
+    is_morning_session = (session_time == "morning")
+    log.info("사이트 세션: %s/%s (KST 기준, morning=%s)", session_date, session_time, is_morning_session)
 
     # 1. 뉴스 수집
     log.info("[1/9] 뉴스 수집 시작...")
@@ -1211,7 +1213,7 @@ def run_cloud() -> None:
         _print_daily_once_summary(results)
         return
 
-    # 3. 사이트용 5개 이슈 추출
+    # 3. 사이트용 5개 이슈 추출 (morning/evening 둘 다)
     log.info("[3/9] 사이트용 이슈 추출 시작...")
     t = _time.time()
     try:
@@ -1258,7 +1260,7 @@ def run_cloud() -> None:
         log.info("[5/9] NOTION env 없음 — 스킵")
         results["노션"] = "스킵"
 
-    # 6. Supabase upsert (노션 URL 포함)
+    # 6. Supabase upsert (morning/evening 둘 다 — 사이트는 양쪽 슬롯 갱신)
     log.info("[6/9] Supabase 저장 시작...")
     t = _time.time()
     try:
@@ -1276,36 +1278,19 @@ def run_cloud() -> None:
         log.exception("[6/9] Supabase 저장 실패 (계속 진행)")
         results["Supabase"] = "실패"
 
-    # 7. 카카오톡 (KAKAO env 있을 때만)
-    if KAKAO_REST_API_KEY and (KAKAO_REFRESH_TOKEN_ENV or TOKEN_FILE.exists()):
-        log.info("[7/9] 카카오톡 전송 시작...")
-        t = _time.time()
-        try:
-            site_briefing_url = f"{SITE_BASE_URL}/briefing/{session_date}/{session_time}"
-            msg = (
-                f"🕐 {time_str}\n"
-                f"{market_status_str}\n\n"
-                f"{kakao_summary}\n\n"
-                f"전체 브리핑 보기:\n{site_briefing_url}"
-            )
-            if doc_link:
-                msg += f"\n\n노션 백업:\n{doc_link}"
-            send_kakao_message(msg)
-            log.info("[7/9] 카카오톡 전송 완료 (%.1f초)", _time.time() - t)
-            results["카카오"] = "성공"
-        except Exception:
-            log.exception("[7/9] 카카오 전송 실패")
-            results["카카오"] = "실패"
-    else:
-        log.info("[7/9] KAKAO env 없음 — 스킵")
-        results["카카오"] = "스킵"
+    # 7. 카카오톡 — ★ 서비스 종료. 노션 + 사이트만 운영.
+    log.info("[7/9] 카톡 서비스 종료 — 스킵 (노션/사이트만 운영)")
+    results["카카오"] = "스킵 (서비스 종료)"
 
-    # 8-9. 카드뉴스 + Gmail (AUTO_CARDNEWS 또는 GMAIL env 둘 다 있을 때만)
+    # 8-9. 카드뉴스 + Gmail
+    # ★ morning 세션에만 실행 (evening은 Anthropic + Unsplash API 비용 절약 위해 스킵)
     GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS", "").strip()
     GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "").strip()
-    # 클라우드 모드: GMAIL env 둘 다 있으면 카드뉴스+Gmail 무조건 실행.
-    # (AUTO_CARDNEWS 플래그는 PC 수동 운영 시절 잔재라 클라우드에선 무시)
-    if GMAIL_ADDRESS and GMAIL_APP_PASSWORD:
+    if not is_morning_session:
+        log.info("[8-9] evening 세션 — 카드뉴스/Gmail 스킵 (morning에만 생성, API 비용 절약)")
+        results["카드뉴스"] = "스킵 (evening)"
+        results["Gmail"] = "스킵 (evening)"
+    elif GMAIL_ADDRESS and GMAIL_APP_PASSWORD:
         log.info("[8/9] 카드뉴스 생성 시작...")
         t = _time.time()
         png_files, cards_data = [], []

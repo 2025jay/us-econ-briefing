@@ -1,11 +1,13 @@
 name: News bot — twice daily
 
 on:
-  # KST 08:30 / 20:30 = UTC 23:30 (전날) / 11:30
-  # 봇 실행에 5~10분 정도 걸릴 수 있으니 사이트 업데이트는 KST 08:35~08:40쯤 보임
+  # 목표 도착시각: KST 08:30 (morning) / 20:30 (evening)
+  # GitHub Actions cron 자체가 5~30분 지연되는 일이 잦아, 10분 일찍 트리거해서 흡수.
+  # 트리거: KST 08:20 / 20:20 = UTC 23:20 (전날) / 11:20
+  # 봇 실행에 추가로 5~10분 걸리므로 사이트 업데이트는 KST 08:30~08:40 / 20:30~20:40 사이.
   schedule:
-    - cron: "30 23 * * *"   # KST 08:30 morning
-    - cron: "30 11 * * *"   # KST 20:30 evening
+    - cron: "20 23 * * *"   # KST 08:20 morning trigger → 도착 ~08:30
+    - cron: "20 11 * * *"   # KST 20:20 evening trigger → 도착 ~20:30
   # 수동 트리거 (Actions 탭에서 'Run workflow' 버튼)
   workflow_dispatch:
 
