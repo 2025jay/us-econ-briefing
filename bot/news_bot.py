@@ -410,7 +410,7 @@ _SYSTEM_PROMPT = (
     "\n"
     "내부 선정 기준 (본문에 노출 금지):\n"
     "경제영향도, 정책변화, 기업실적, 지정학리스크 네 축으로 판단해\n"
-    "상위 10개 핵심 뉴스를 선정합니다. 점수나 기준명은 글에 쓰지 않습니다."
+    "상위 20개 핵심 뉴스를 선정합니다. 점수나 기준명은 글에 쓰지 않습니다."
 )
 
 
@@ -474,7 +474,7 @@ def analyze_news(articles: list, market_context: str, is_weekend: bool) -> tuple
         "규칙:\n"
         "- 원문 팩트만 전달. 과장/축소/추측/의견 금지.\n"
         "- 수치는 원문 그대로.\n"
-        "- 4가지 기준(경제영향도, 정책변화, 기업실적, 지정학리스크)으로 점수를 매겨 상위 10개 TOP 뉴스를 선정.\n"
+        "- 4가지 기준(경제영향도, 정책변화, 기업실적, 지정학리스크)으로 점수를 매겨 상위 20개 TOP 뉴스를 선정. (심층 분석 약 15개 + 기타 뉴스 약 5개, 합계 20개. 수집 건수가 부족하면 가능한 만큼)\n"
         f"{weekend_instruction}{market_instruction}\n\n"
     )
 
@@ -490,7 +490,7 @@ def analyze_news(articles: list, market_context: str, is_weekend: bool) -> tuple
     t0 = _time.time()
     docs_resp = client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=8000,
+        max_tokens=12000,
         system=system_block,
         messages=[{
             "role": "user",
@@ -525,7 +525,7 @@ def analyze_news(articles: list, market_context: str, is_weekend: bool) -> tuple
                 "  {\"type\": \"article\", \"text\": \"2. 다음 소제목...\"},\n"
                 "  ...(1부터 순서대로 번호)\n"
                 "  {\"type\": \"section\", \"text\": \"기타 뉴스\"},\n"
-                "  {\"type\": \"article\", \"text\": \"11. 소제목 (한국어 번역 제목)\"},\n"
+                "  {\"type\": \"article\", \"text\": \"16. 소제목 (한국어 번역 제목)\"},\n"
                 "  {\"type\": \"body\", \"text\": \"2줄 이내 요약\"},\n"
                 "  {\"type\": \"source\", \"text\": \"출처: 원문 영문 기사 제목 · 매체명\"},\n"
                 "  ...\n"
@@ -1030,7 +1030,7 @@ def _print_daily_once_summary(results: dict) -> None:
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 클라우드 모드 (GitHub Actions 진입점)
-#   매 실행 1회: 뉴스 수집 → Claude 분석 → 사이트 5개 이슈 추출
+#   매 실행 1회: 뉴스 수집 → Claude 분석 → 사이트 이슈 추출(노션 미러)
 #                → 시장 시황 → Supabase upsert → 노션
 #   카드뉴스/Gmail/카카오는 서비스에서 제거됨.
 #   세션(morning/evening)은 KST 현재 시각으로 자동 판별.
@@ -1090,7 +1090,7 @@ def run_cloud() -> None:
         _print_daily_once_summary(results)
         return
 
-    # 3. 사이트용 5개 이슈 추출 (morning/evening 둘 다)
+    # 3. 사이트용 이슈 추출 (노션 docs 미러, morning/evening 둘 다)
     log.info("[3/7] 사이트용 이슈 추출 시작...")
     t = _time.time()
     try:

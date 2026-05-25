@@ -42,7 +42,7 @@ export async function getLatestBriefing(): Promise<Briefing> {
       .from("briefings")
       .select("*")
       .order("session_date", { ascending: false })
-      .order("session_time", { ascending: false })
+      .order("generated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
     if (error) throw error;
@@ -85,7 +85,7 @@ export async function getRecentBriefings(n = 6): Promise<Briefing[]> {
       .from("briefings")
       .select("*")
       .order("session_date", { ascending: false })
-      .order("session_time", { ascending: false })
+      .order("generated_at", { ascending: false })
       .limit(n);
     if (error) throw error;
     if (!data || data.length === 0) return mockGetRecent(n);
@@ -103,7 +103,7 @@ export async function getAllBriefings(): Promise<Briefing[]> {
       .from("briefings")
       .select("*")
       .order("session_date", { ascending: false })
-      .order("session_time", { ascending: false })
+      .order("generated_at", { ascending: false })
       .limit(200);
     if (error) throw error;
     if (!data || data.length === 0) return mockBriefings;
