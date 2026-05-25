@@ -2,12 +2,15 @@ name: News bot — twice daily
 
 on:
   # 목표 도착시각: KST 08:30 (morning) / 20:30 (evening)
-  # GitHub Actions cron 자체가 5~30분 지연되는 일이 잦아, 10분 일찍 트리거해서 흡수.
-  # 트리거: KST 08:20 / 20:20 = UTC 23:20 (전날) / 11:20
-  # 봇 실행에 추가로 5~10분 걸리므로 사이트 업데이트는 KST 08:30~08:40 / 20:30~20:40 사이.
+  # 실측(05-16~25): GitHub schedule이 아침 ~50분, 저녁 +47분~3시간 지연됨(공용 러너 큐 혼잡).
+  # → 트리거를 앞당겨 지연을 흡수: 아침 50분, 저녁 2시간 일찍.
+  #   morning: UTC 22:30 = KST 07:30 (50분 일찍)  → +지연 → 도착 ~08:30 근처
+  #   evening: UTC 09:20 = KST 18:20 (2시간 일찍) → +지연 → 도착 ~20:30 근처
+  # ※ 지연이 작은 날엔 목표보다 일찍 도착할 수 있음(특히 저녁). schedule의 구조적 한계.
+  #   세션 판별은 실행 시각 KST<14시면 morning — 경계까지 여유 충분.
   schedule:
-    - cron: "20 23 * * *"   # KST 08:20 morning trigger → 도착 ~08:30
-    - cron: "20 11 * * *"   # KST 20:20 evening trigger → 도착 ~20:30
+    - cron: "30 22 * * *"   # KST 07:30 morning trigger (50분 일찍) → 지연 흡수
+    - cron: "20 09 * * *"   # KST 18:20 evening trigger (2시간 일찍) → 지연 흡수
   # 수동 트리거 (Actions 탭에서 'Run workflow' 버튼)
   workflow_dispatch:
 
