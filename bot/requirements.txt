@@ -1,13 +1,8 @@
 requests
 anthropic
 pytz
-Pillow
 feedparser
 yfinance
 notion-client
-playwright
 supabase
-google-api-python-client
-google-auth
-google-auth-oauthlib
 apscheduler

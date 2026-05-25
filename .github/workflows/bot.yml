@@ -38,35 +38,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Playwright chromium — 카드뉴스 PNG 1080×1080 캡처에 사용.
-      # 매 실행 ~30초 소요되지만 카드뉴스를 풀 자동화하려면 필수.
-      # GitHub Actions ubuntu-latest는 chromium 의존성을 미리 가지고 있어 빠름.
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}
-          restore-keys: |
-            playwright-chromium-
-
-      - name: Install Playwright chromium
-        working-directory: bot
-        run: |
-          python -m playwright install --with-deps chromium
-
       - name: Run bot (cloud mode)
         working-directory: bot
         env:
           ANTHROPIC_API_KEY:          ${{ secrets.ANTHROPIC_API_KEY }}
-          UNSPLASH_ACCESS_KEY:        ${{ secrets.UNSPLASH_ACCESS_KEY }}
           KAKAO_REST_API_KEY:         ${{ secrets.KAKAO_REST_API_KEY }}
           KAKAO_REFRESH_TOKEN:        ${{ secrets.KAKAO_REFRESH_TOKEN }}
           NOTION_API_KEY:             ${{ secrets.NOTION_API_KEY }}
           NOTION_PAGE_ID:             ${{ secrets.NOTION_PAGE_ID }}
           SUPABASE_URL:               ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          GMAIL_ADDRESS:              ${{ secrets.GMAIL_ADDRESS }}
-          GMAIL_APP_PASSWORD:         ${{ secrets.GMAIL_APP_PASSWORD }}
           SITE_BASE_URL:              ${{ secrets.SITE_BASE_URL }}
         run: python news_bot.py cloud
 

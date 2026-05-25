@@ -72,7 +72,6 @@ SITE_BASE_URL       = os.environ.get(
 # GitHub Actions cron이 직접 호출하므로 BlockingScheduler는 더이상 사용 안 함.
 # 로컬 PC 수동 운영 시절 잔재. 클라우드에선 의미 없음.
 AUTO_SCHEDULE = False
-AUTO_CARDNEWS = False
 
 # ─── 상수 ──────────────────────────────────────────────────
 BASE_DIR   = Path(__file__).parent
@@ -846,38 +845,6 @@ def run_pipeline() -> None:
         send_kakao_message(msg)
         log.info("[4/4] 카카오톡 전송 완료 (%.1f초)", _time.time() - t_step)
 
-        # 5-6. 카드뉴스 생성 + Gmail 발송 (AUTO_CARDNEWS=True 그리고 18:00 ET에만)
-        # 인스타그램 자동 게시는 Meta API 이슈로 비활성화 (아래 주석 참고)
-        is_18_et = (now_et.hour == 18)
-        if AUTO_CARDNEWS and is_18_et:
-            try:
-                log.info("[5/6] 카드뉴스 생성 시작...")
-                t_step = _time.time()
-                from card_news_generator import generate_card_news
-                card_date_str = f"{now_et.strftime('%Y.%m.%d %a').upper()} · {now_et.strftime('%H:%M')} ET"
-                png_files, cards_data = generate_card_news(docs_blocks, card_date_str)
-                log.info("[5/6] 카드뉴스 생성 완료: %d장 (%.1f초)", len(png_files), _time.time() - t_step)
-
-                # 6. Gmail 발송 (인스타 API 풀리면 아래 주석 해제)
-                if png_files:
-                    log.info("[6/6] Gmail 카드뉴스 발송 시작...")
-                    t_step = _time.time()
-                    from gmail_sender import send_card_news_email
-                    sent = send_card_news_email(png_files, cards_data, card_date_str)
-                    log.info("[6/6] Gmail 발송 %s (%.1f초)",
-                             "완료" if sent else "실패", _time.time() - t_step)
-
-                    # ── 미래: 인스타 API 풀리면 아래 주석 해제 ──
-                    # from instagram_poster import post_carousel_to_instagram
-                    # post_id = post_carousel_to_instagram(png_files, cards_data)
-                else:
-                    log.warning("[5/6] 카드뉴스 생성 실패 — Gmail 발송 건너뜀")
-            except Exception:
-                log.exception("[5-6] 카드뉴스/Gmail 처리 실패 (기존 파이프라인에는 영향 없음)")
-        else:
-            log.info("[5-6] 카드뉴스 생성 스킵 (AUTO_CARDNEWS=%s, 18시=%s)",
-                     AUTO_CARDNEWS, is_18_et)
-
         log.info("=== 파이프라인 완료 ===")
 
     except Exception:
@@ -965,9 +932,8 @@ def run_briefing_only() -> None:
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 전체 파이프라인 1회 실행 (daily-once)
-#   run_pipeline 의 6단계 흐름(수집→분석→노션→카톡→카드뉴스→메일)을
-#   AUTO_CARDNEWS / 시간 조건 없이 무조건 전부 실행.
-#   run_pipeline 본체는 건드리지 않고 별도 함수로 분리.
+#   수집→분석→노션→카톡 4단계를 시간 조건 없이 1회 실행.
+#   (카드뉴스/Gmail은 서비스에서 제거됨)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def run_daily_once() -> None:
@@ -984,58 +950,56 @@ def run_daily_once() -> None:
         "Claude분석": "미실행",
         "노션": "미실행",
         "카카오": "미실행",
-        "카드뉴스": "미실행",
-        "Gmail": "미실행",
     }
 
     # 1. 뉴스 수집
-    log.info("[1/6] 뉴스 수집 시작...")
+    log.info("[1/4] 뉴스 수집 시작...")
     t_step = _time.time()
     try:
         articles = fetch_news()
-        log.info("[1/6] 뉴스 수집 완료: %d건 (%.1f초)", len(articles), _time.time() - t_step)
+        log.info("[1/4] 뉴스 수집 완료: %d건 (%.1f초)", len(articles), _time.time() - t_step)
         results["뉴스수집"] = f"성공 ({len(articles)}건)"
     except Exception:
-        log.exception("[1/6] 뉴스 수집 실패 — 종료")
+        log.exception("[1/4] 뉴스 수집 실패 — 종료")
         results["뉴스수집"] = "실패"
         _print_daily_once_summary(results)
         return
 
     if not articles:
-        log.warning("[1/6] 수집된 뉴스 없음 — 종료")
+        log.warning("[1/4] 수집된 뉴스 없음 — 종료")
         results["뉴스수집"] = "성공 (0건)"
         _print_daily_once_summary(results)
         return
 
     # 2. Claude 분석
-    log.info("[2/6] Claude 분석 시작...")
+    log.info("[2/4] Claude 분석 시작...")
     t_step = _time.time()
     docs_blocks = None
     kakao_summary = ""
     try:
         docs_blocks, kakao_summary = analyze_news(articles, market_context, is_weekend)
-        log.info("[2/6] Claude 분석 완료 (%.1f초)", _time.time() - t_step)
+        log.info("[2/4] Claude 분석 완료 (%.1f초)", _time.time() - t_step)
         results["Claude분석"] = f"성공 ({len(docs_blocks)}블록)"
     except Exception:
-        log.exception("[2/6] Claude 분석 실패 — 이후 단계 불가, 종료")
+        log.exception("[2/4] Claude 분석 실패 — 이후 단계 불가, 종료")
         results["Claude분석"] = "실패"
         _print_daily_once_summary(results)
         return
 
     # 3. 노션 페이지 생성
     doc_link = None
-    log.info("[3/6] 노션 페이지 생성 시작...")
+    log.info("[3/4] 노션 페이지 생성 시작...")
     t_step = _time.time()
     try:
         doc_link = generate_notion_page(docs_blocks, articles, time_str, market_status)
-        log.info("[3/6] 노션 페이지 생성 완료 (%.1f초)", _time.time() - t_step)
+        log.info("[3/4] 노션 페이지 생성 완료 (%.1f초)", _time.time() - t_step)
         results["노션"] = "성공"
     except Exception:
-        log.exception("[3/6] 노션 페이지 생성 실패 (카카오 전송은 계속 진행)")
+        log.exception("[3/4] 노션 페이지 생성 실패 (카카오 전송은 계속 진행)")
         results["노션"] = "실패"
 
     # 4. 카카오톡 메시지 전송
-    log.info("[4/6] 카카오톡 메시지 전송 시작...")
+    log.info("[4/4] 카카오톡 메시지 전송 시작...")
     t_step = _time.time()
     try:
         msg = (
@@ -1047,44 +1011,11 @@ def run_daily_once() -> None:
             msg += f"\n\n전체 브리핑 보기:\n{doc_link}"
 
         send_kakao_message(msg)
-        log.info("[4/6] 카카오톡 전송 완료 (%.1f초)", _time.time() - t_step)
+        log.info("[4/4] 카카오톡 전송 완료 (%.1f초)", _time.time() - t_step)
         results["카카오"] = "성공"
     except Exception:
-        log.exception("[4/6] 카카오 전송 실패 (카드뉴스/메일은 계속 진행)")
+        log.exception("[4/4] 카카오 전송 실패")
         results["카카오"] = "실패"
-
-    # 5. 카드뉴스 생성
-    png_files: list = []
-    cards_data: list = []
-    card_date_str = f"{now_et.strftime('%Y.%m.%d %a').upper()} · {now_et.strftime('%H:%M')} ET"
-    log.info("[5/6] 카드뉴스 생성 시작...")
-    t_step = _time.time()
-    try:
-        from card_news_generator import generate_card_news
-        png_files, cards_data = generate_card_news(docs_blocks, card_date_str)
-        log.info("[5/6] 카드뉴스 생성 완료: %d장 (%.1f초)",
-                 len(png_files), _time.time() - t_step)
-        results["카드뉴스"] = f"성공 ({len(png_files)}장)" if png_files else "실패 (0장)"
-    except Exception:
-        log.exception("[5/6] 카드뉴스 생성 실패 (메일 발송은 스킵)")
-        results["카드뉴스"] = "실패"
-
-    # 6. Gmail 발송 — 카드뉴스 성공 시에만
-    if png_files:
-        log.info("[6/6] Gmail 발송 시작...")
-        t_step = _time.time()
-        try:
-            from gmail_sender import send_card_news_email
-            sent = send_card_news_email(png_files, cards_data, card_date_str)
-            log.info("[6/6] Gmail 발송 %s (%.1f초)",
-                     "완료" if sent else "실패", _time.time() - t_step)
-            results["Gmail"] = "성공" if sent else "실패"
-        except Exception:
-            log.exception("[6/6] Gmail 발송 중 예외")
-            results["Gmail"] = "실패"
-    else:
-        log.warning("[6/6] 카드뉴스 PNG 없음 — Gmail 발송 스킵")
-        results["Gmail"] = "스킵 (PNG 없음)"
 
     _print_daily_once_summary(results)
     log.info("=== [전체 1회 모드] 완료 ===")
@@ -1098,64 +1029,10 @@ def _print_daily_once_summary(results: dict) -> None:
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 카드뉴스 전용 수동 실행 (--cardnews)
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-def run_cardnews_only() -> None:
-    """
-    뉴스 수집 → Claude 분석 → 카드뉴스 PNG 생성 → Gmail 발송.
-    노션 페이지 생성과 카카오톡 전송은 건너뜀.
-    """
-    now_et   = datetime.now(ET)
-    now_kst  = now_et.astimezone(KST)
-    time_str = f"{now_et.strftime('%Y-%m-%d %H:%M')} ET (한국시간 {now_kst.strftime('%H:%M')} KST)"
-    log.info("=== [카드뉴스 전용 모드] 시작: %s ===", time_str)
-
-    market_context, market_status, is_weekend = _get_market_context(now_et)
-    log.info("시장 상태: %s", market_status)
-
-    # 1. 뉴스 수집
-    log.info("[1/4] 뉴스 수집 시작...")
-    t_step = _time.time()
-    articles = fetch_news()
-    log.info("[1/4] 뉴스 수집 완료: %d건 (%.1f초)", len(articles), _time.time() - t_step)
-    if not articles:
-        log.warning("수집된 뉴스 없음 — 종료")
-        return
-
-    # 2. Claude 분석
-    log.info("[2/4] Claude 분석 시작...")
-    t_step = _time.time()
-    docs_blocks, _ = analyze_news(articles, market_context, is_weekend)
-    log.info("[2/4] Claude 분석 완료 (%.1f초)", _time.time() - t_step)
-
-    # 3. 카드뉴스 PNG 생성
-    log.info("[3/4] 카드뉴스 생성 시작...")
-    t_step = _time.time()
-    from card_news_generator import generate_card_news
-    card_date_str = f"{now_et.strftime('%Y.%m.%d %a').upper()} · {now_et.strftime('%H:%M')} ET"
-    png_files, cards_data = generate_card_news(docs_blocks, card_date_str)
-    log.info("[3/4] 카드뉴스 생성 완료: %d장 (%.1f초)", len(png_files), _time.time() - t_step)
-
-    if not png_files:
-        log.error("카드뉴스 생성 실패 — 종료")
-        return
-
-    # 4. Gmail 발송
-    log.info("[4/4] Gmail 발송 시작...")
-    t_step = _time.time()
-    from gmail_sender import send_card_news_email
-    sent = send_card_news_email(png_files, cards_data, card_date_str)
-    log.info("[4/4] Gmail 발송 %s (%.1f초)",
-             "완료" if sent else "실패", _time.time() - t_step)
-    log.info("=== [카드뉴스 전용 모드] 완료 ===")
-
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 클라우드 모드 (GitHub Actions 진입점)
 #   매 실행 1회: 뉴스 수집 → Claude 분석 → 사이트 5개 이슈 추출
-#                → 시장 시황 → Supabase upsert → 노션 → 카카오톡(사이트 링크)
-#   카드뉴스/Gmail은 사용자가 AUTO_CARDNEWS 또는 GMAIL env 세팅했을 때만.
+#                → 시장 시황 → Supabase upsert → 노션
+#   카드뉴스/Gmail/카카오는 서비스에서 제거됨.
 #   세션(morning/evening)은 KST 현재 시각으로 자동 판별.
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1171,97 +1048,97 @@ def run_cloud() -> None:
     results = {
         "뉴스수집": "미실행", "Claude분석": "미실행", "사이트추출": "미실행",
         "시장시황": "미실행", "Supabase": "미실행",
-        "노션": "미실행", "카카오": "미실행", "카드뉴스": "미실행", "Gmail": "미실행",
+        "노션": "미실행", "카카오": "미실행",
     }
 
     # ── 사이트 세션 결정 ──
-    # ★ 정책: morning/evening 모두 사이트·노션 갱신. 카드뉴스/Gmail만 morning 전용(API 절감).
+    # ★ 정책: morning/evening 모두 사이트·노션 갱신.
     from supabase_writer import get_site_session, upsert_briefing
     session_date, session_time = get_site_session(now_kst)
     is_morning_session = (session_time == "morning")
     log.info("사이트 세션: %s/%s (KST 기준, morning=%s)", session_date, session_time, is_morning_session)
 
     # 1. 뉴스 수집
-    log.info("[1/9] 뉴스 수집 시작...")
+    log.info("[1/7] 뉴스 수집 시작...")
     t = _time.time()
     try:
         articles = fetch_news()
-        log.info("[1/9] 뉴스 수집 완료: %d건 (%.1f초)", len(articles), _time.time() - t)
+        log.info("[1/7] 뉴스 수집 완료: %d건 (%.1f초)", len(articles), _time.time() - t)
         results["뉴스수집"] = f"성공 ({len(articles)}건)"
     except Exception:
-        log.exception("[1/9] 뉴스 수집 실패")
+        log.exception("[1/7] 뉴스 수집 실패")
         results["뉴스수집"] = "실패"
         _print_daily_once_summary(results)
         return
 
     if not articles:
-        log.warning("[1/9] 수집된 뉴스 없음 — 종료")
+        log.warning("[1/7] 수집된 뉴스 없음 — 종료")
         results["뉴스수집"] = "성공 (0건)"
         _print_daily_once_summary(results)
         return
 
     # 2. Claude 분석 (노션용 docs + 카카오 요약)
-    log.info("[2/9] Claude 분석 시작...")
+    log.info("[2/7] Claude 분석 시작...")
     t = _time.time()
     try:
         docs_blocks, kakao_summary = analyze_news(articles, market_context, is_weekend)
-        log.info("[2/9] Claude 분석 완료 (%.1f초)", _time.time() - t)
+        log.info("[2/7] Claude 분석 완료 (%.1f초)", _time.time() - t)
         results["Claude분석"] = f"성공 ({len(docs_blocks)}블록)"
     except Exception:
-        log.exception("[2/9] Claude 분석 실패 — 종료")
+        log.exception("[2/7] Claude 분석 실패 — 종료")
         results["Claude분석"] = "실패"
         _print_daily_once_summary(results)
         return
 
     # 3. 사이트용 5개 이슈 추출 (morning/evening 둘 다)
-    log.info("[3/9] 사이트용 이슈 추출 시작...")
+    log.info("[3/7] 사이트용 이슈 추출 시작...")
     t = _time.time()
     try:
         from site_extractor import extract_for_site
         site_payload = extract_for_site(docs_blocks)
         log.info(
-            "[3/9] 사이트 추출 완료: intro %d자, items %d개 (%.1f초)",
+            "[3/7] 사이트 추출 완료: intro %d자, items %d개 (%.1f초)",
             len(site_payload.get("briefing_intro", "")),
             len(site_payload.get("items", [])),
             _time.time() - t,
         )
         results["사이트추출"] = f"성공 ({len(site_payload.get('items', []))}개)"
     except Exception:
-        log.exception("[3/9] 사이트 추출 실패")
+        log.exception("[3/7] 사이트 추출 실패")
         results["사이트추출"] = "실패"
         site_payload = {"briefing_intro": "", "items": []}
 
     # 4. 시장 시황 (yfinance)
-    log.info("[4/9] 시장 시황 수집 시작...")
+    log.info("[4/7] 시장 시황 수집 시작...")
     t = _time.time()
     try:
         from market_fetcher import fetch_market_status
         market_status = fetch_market_status()
-        log.info("[4/9] 시장 시황 완료 (%.1f초)", _time.time() - t)
+        log.info("[4/7] 시장 시황 완료 (%.1f초)", _time.time() - t)
         results["시장시황"] = "성공" if market_status else "실패 (None)"
     except Exception:
-        log.exception("[4/9] 시장 시황 수집 실패 (계속 진행)")
+        log.exception("[4/7] 시장 시황 수집 실패 (계속 진행)")
         market_status = None
         results["시장시황"] = "실패"
 
     # 5. 노션 페이지 (NOTION env 있을 때만) — 먼저 생성해서 URL 받아옴
     doc_link = None
     if NOTION_API_KEY and NOTION_PAGE_ID:
-        log.info("[5/9] 노션 페이지 생성 시작...")
+        log.info("[5/7] 노션 페이지 생성 시작...")
         t = _time.time()
         try:
             doc_link = generate_notion_page(docs_blocks, articles, time_str, market_status_str)
-            log.info("[5/9] 노션 페이지 생성 완료 (%.1f초)", _time.time() - t)
+            log.info("[5/7] 노션 페이지 생성 완료 (%.1f초)", _time.time() - t)
             results["노션"] = "성공"
         except Exception:
-            log.exception("[5/9] 노션 페이지 생성 실패")
+            log.exception("[5/7] 노션 페이지 생성 실패")
             results["노션"] = "실패"
     else:
-        log.info("[5/9] NOTION env 없음 — 스킵")
+        log.info("[5/7] NOTION env 없음 — 스킵")
         results["노션"] = "스킵"
 
     # 6. Supabase upsert (morning/evening 둘 다 — 사이트는 양쪽 슬롯 갱신)
-    log.info("[6/9] Supabase 저장 시작...")
+    log.info("[6/7] Supabase 저장 시작...")
     t = _time.time()
     try:
         row_id = upsert_briefing(
@@ -1272,55 +1149,15 @@ def run_cloud() -> None:
             items=site_payload.get("items", []),
             notion_url=doc_link,
         )
-        log.info("[6/9] Supabase 저장 완료 (%.1f초)", _time.time() - t)
+        log.info("[6/7] Supabase 저장 완료 (%.1f초)", _time.time() - t)
         results["Supabase"] = f"성공 ({row_id})" if row_id else "실패/스킵"
     except Exception:
-        log.exception("[6/9] Supabase 저장 실패 (계속 진행)")
+        log.exception("[6/7] Supabase 저장 실패 (계속 진행)")
         results["Supabase"] = "실패"
 
     # 7. 카카오톡 — ★ 서비스 종료. 노션 + 사이트만 운영.
-    log.info("[7/9] 카톡 서비스 종료 — 스킵 (노션/사이트만 운영)")
+    log.info("[7/7] 카톡 서비스 종료 — 스킵 (노션/사이트만 운영)")
     results["카카오"] = "스킵 (서비스 종료)"
-
-    # 8-9. 카드뉴스 + Gmail
-    # ★ morning 세션에만 실행 (evening은 Anthropic + Unsplash API 비용 절약 위해 스킵)
-    GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS", "").strip()
-    GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "").strip()
-    if not is_morning_session:
-        log.info("[8-9] evening 세션 — 카드뉴스/Gmail 스킵 (morning에만 생성, API 비용 절약)")
-        results["카드뉴스"] = "스킵 (evening)"
-        results["Gmail"] = "스킵 (evening)"
-    elif GMAIL_ADDRESS and GMAIL_APP_PASSWORD:
-        log.info("[8/9] 카드뉴스 생성 시작...")
-        t = _time.time()
-        png_files, cards_data = [], []
-        try:
-            from card_news_generator import generate_card_news
-            card_date_str = f"{now_et.strftime('%Y.%m.%d %a').upper()} · {now_et.strftime('%H:%M')} ET"
-            png_files, cards_data = generate_card_news(docs_blocks, card_date_str)
-            log.info("[8/9] 카드뉴스 생성 완료: %d장 (%.1f초)", len(png_files), _time.time() - t)
-            results["카드뉴스"] = f"성공 ({len(png_files)}장)" if png_files else "실패 (0장)"
-        except Exception:
-            log.exception("[8/9] 카드뉴스 생성 실패")
-            results["카드뉴스"] = "실패"
-
-        if png_files:
-            log.info("[9/9] Gmail 발송 시작...")
-            t = _time.time()
-            try:
-                from gmail_sender import send_card_news_email
-                sent = send_card_news_email(png_files, cards_data, card_date_str)
-                log.info("[9/9] Gmail 발송 %s (%.1f초)", "완료" if sent else "실패", _time.time() - t)
-                results["Gmail"] = "성공" if sent else "실패"
-            except Exception:
-                log.exception("[9/9] Gmail 발송 예외")
-                results["Gmail"] = "실패"
-        else:
-            results["Gmail"] = "스킵 (PNG 없음)"
-    else:
-        log.info("[8-9] 카드뉴스/Gmail 스킵 — GMAIL_ADDRESS/GMAIL_APP_PASSWORD 미설정")
-        results["카드뉴스"] = "스킵"
-        results["Gmail"] = "스킵"
 
     _print_daily_once_summary(results)
     log.info("=== [클라우드 모드] 완료 ===")
@@ -1371,14 +1208,9 @@ def main() -> None:
         return
 
     if "daily-once" in sys.argv:
-        log.info("전체 1회 실행 모드 (뉴스+노션+카톡+카드뉴스+Gmail)")
+        log.info("전체 1회 실행 모드 (뉴스+노션+카톡)")
         get_access_token()
         run_daily_once()
-        return
-
-    if "--cardnews" in sys.argv:
-        log.info("카드뉴스 전용 모드 (뉴스+분석+카드뉴스+Gmail)")
-        run_cardnews_only()
         return
 
     if "cloud" in sys.argv:
@@ -1394,12 +1226,10 @@ def main() -> None:
         log.info("  python news_bot.py cloud            # 클라우드 모드 (Actions cron이 호출)")
         log.info("  python news_bot.py --now            # 뉴스+노션+카톡 즉시 실행")
         log.info("  python news_bot.py briefing-once    # 브리핑+노션+카톡 내게쓰기 (카드뉴스/메일 제외)")
-        log.info("  python news_bot.py daily-once       # 전체 1회 (뉴스+노션+카톡+카드뉴스+Gmail)")
-        log.info("  python news_bot.py --cardnews       # 카드뉴스 생성 + Gmail 발송")
+        log.info("  python news_bot.py daily-once       # 전체 1회 (뉴스+노션+카톡)")
         log.info("  python news_bot.py --auth           # 카카오 재인증")
         log.info("")
         log.info("자동화를 켜려면 news_bot.py 상단의 AUTO_SCHEDULE=True로 변경하세요.")
-        log.info("(카드뉴스 자동화는 AUTO_CARDNEWS=True도 함께 설정)")
         log.info("=" * 60)
         return
 
